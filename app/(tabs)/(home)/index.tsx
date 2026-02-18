@@ -29,7 +29,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAthan } from '@/contexts/AthanContext';
-import { getTimeUntil, PrayerName } from '@/utils/prayerTimes';
+import { getTimeUntil, getNextPrayer, PrayerName } from '@/utils/prayerTimes';
 
 const PRAYER_ICONS: Record<PrayerName, React.ComponentType<{ size: number; color: string }>> = {
   fajr: Sunrise,
@@ -142,7 +142,7 @@ export default function HomeScreen() {
   const {
     settings,
     dailyPrayers,
-    nextPrayer,
+    nextPrayer: contextNextPrayer,
     locationLoading,
     toggleGlobal,
     isAdhanPlaying,
@@ -151,7 +151,10 @@ export default function HomeScreen() {
   } = useAthan();
 
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 });
+  const [localNextPrayer, setLocalNextPrayer] = useState(contextNextPrayer);
   const [showWelcome, setShowWelcome] = useState(false);
+
+  const nextPrayer = localNextPrayer ?? contextNextPrayer;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnims = useRef(
@@ -203,13 +206,28 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (!nextPrayer) return;
-    const interval = setInterval(() => {
-      setCountdown(getTimeUntil(nextPrayer.time));
-    }, 1000);
-    setCountdown(getTimeUntil(nextPrayer.time));
+    const updateCountdown = () => {
+      const freshNext = getNextPrayer(dailyPrayers.prayers);
+      if (freshNext) {
+        if (!localNextPrayer || freshNext.name !== localNextPrayer.name) {
+          console.log('[HomeScreen] Next prayer updated to:', freshNext.name, freshNext.time.toLocaleTimeString());
+          setLocalNextPrayer(freshNext);
+        }
+        setCountdown(getTimeUntil(freshNext.time));
+      } else {
+        if (contextNextPrayer) {
+          setLocalNextPrayer(contextNextPrayer);
+          setCountdown(getTimeUntil(contextNextPrayer.time));
+        } else {
+          setCountdown({ hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 });
+        }
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [nextPrayer]);
+  }, [dailyPrayers, contextNextPrayer]);
 
   useEffect(() => {
     if (!isAdhanPlaying) return;

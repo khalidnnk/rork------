@@ -10,7 +10,9 @@ import {
   DailyPrayers,
   calculatePrayerTimes,
   getNextPrayer,
+  getNextPrayerWithTomorrow,
   getTimezoneOffset,
+  getDateKey,
 } from '@/utils/prayerTimes';
 import {
   requestNotificationPermissions,
@@ -241,7 +243,23 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     return () => { cancelled = true; };
   }, [settings.locationMode]);
 
+  const [dateKey, setDateKey] = useState<string>(getDateKey());
+  const [tick, setTick] = useState<number>(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newDateKey = getDateKey();
+      if (newDateKey !== dateKey) {
+        console.log('[AthanContext] Date changed, recalculating prayer times');
+        setDateKey(newDateKey);
+      }
+      setTick((t) => t + 1);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [dateKey]);
+
   const dailyPrayers = useMemo<DailyPrayers>(() => {
+    console.log('[AthanContext] Calculating prayer times for dateKey:', dateKey);
     return calculatePrayerTimes(
       new Date(),
       settings.latitude,
@@ -249,21 +267,24 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       settings.timezone,
       settings.offsets
     );
-  }, [settings.latitude, settings.longitude, settings.timezone, settings.offsets]);
-
-  const [now, setNow] = useState<number>(Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
 
   const nextPrayer = useMemo<PrayerTime | null>(() => {
-    console.log('[AthanContext] Recalculating next prayer at', new Date(now).toLocaleTimeString());
-    return getNextPrayer(dailyPrayers.prayers);
-  }, [dailyPrayers, now]);
+    const now = new Date();
+    console.log('[AthanContext] Recalculating next prayer at', now.toLocaleTimeString());
+    const result = getNextPrayerWithTomorrow(
+      dailyPrayers.prayers,
+      settings.latitude,
+      settings.longitude,
+      settings.timezone,
+      settings.offsets
+    );
+    if (result) {
+      console.log(`[AthanContext] Next prayer: ${result.prayer.name} (tomorrow: ${result.isTomorrow})`);
+      return result.prayer;
+    }
+    return null;
+  }, [dailyPrayers, tick, settings.latitude, settings.longitude, settings.timezone, settings.offsets]);
 
   useEffect(() => {
     if (!settings.globalEnabled || Platform.OS === 'web') return;

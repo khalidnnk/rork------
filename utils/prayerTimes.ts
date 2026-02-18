@@ -187,14 +187,48 @@ export function calculatePrayerTimes(
   return { date: baseDate, prayers };
 }
 
-export function getNextPrayer(prayers: PrayerTime[]): PrayerTime | null {
-  const now = new Date();
+export function getNextPrayer(prayers: PrayerTime[], nowOverride?: Date): PrayerTime | null {
+  const now = nowOverride ?? new Date();
+  const nowMs = now.getTime();
+  console.log('[PrayerTimes] getNextPrayer called at', now.toLocaleTimeString());
   for (const prayer of prayers) {
-    if (prayer.time > now) {
+    const prayerMs = prayer.time.getTime();
+    console.log(`[PrayerTimes]   ${prayer.name}: ${prayer.time.toLocaleTimeString()} (${prayerMs > nowMs ? 'FUTURE' : 'PAST'})`);
+    if (prayerMs > nowMs) {
+      console.log(`[PrayerTimes]   -> Next prayer: ${prayer.name}`);
       return prayer;
     }
   }
+  console.log('[PrayerTimes]   -> No next prayer found for today');
   return null;
+}
+
+export function getNextPrayerWithTomorrow(
+  todayPrayers: PrayerTime[],
+  latitude: number,
+  longitude: number,
+  timezone: number,
+  offsets: Record<PrayerName, number>
+): { prayer: PrayerTime; isTomorrow: boolean } | null {
+  const now = new Date();
+  const todayNext = getNextPrayer(todayPrayers, now);
+  if (todayNext) {
+    return { prayer: todayNext, isTomorrow: false };
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowPrayers = calculatePrayerTimes(tomorrow, latitude, longitude, timezone, offsets);
+  if (tomorrowPrayers.prayers.length > 0) {
+    console.log('[PrayerTimes] All today prayers passed, showing tomorrow Fajr');
+    return { prayer: tomorrowPrayers.prayers[0], isTomorrow: true };
+  }
+  return null;
+}
+
+export function getDateKey(date?: Date): string {
+  const d = date ?? new Date();
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 export function getTimezoneOffset(): number {
