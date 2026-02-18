@@ -244,47 +244,65 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [settings.locationMode]);
 
   const [dateKey, setDateKey] = useState<string>(getDateKey());
-  const [tick, setTick] = useState<number>(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const newDateKey = getDateKey();
-      if (newDateKey !== dateKey) {
-        console.log('[AthanContext] Date changed, recalculating prayer times');
-        setDateKey(newDateKey);
-      }
-      setTick((t) => t + 1);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [dateKey]);
-
-  const dailyPrayers = useMemo<DailyPrayers>(() => {
-    console.log('[AthanContext] Calculating prayer times for dateKey:', dateKey);
+  const [dailyPrayers, setDailyPrayers] = useState<DailyPrayers>(() => {
+    console.log('[AthanContext] Initial prayer times calculation');
     return calculatePrayerTimes(
       new Date(),
+      DEFAULT_SETTINGS.latitude,
+      DEFAULT_SETTINGS.longitude,
+      DEFAULT_SETTINGS.timezone,
+      DEFAULT_SETTINGS.offsets
+    );
+  });
+  const [nextPrayer, setNextPrayer] = useState<PrayerTime | null>(null);
+
+  useEffect(() => {
+    console.log('[AthanContext] Recalculating prayer times for dateKey:', dateKey);
+    const now = new Date();
+    const prayers = calculatePrayerTimes(
+      now,
       settings.latitude,
       settings.longitude,
       settings.timezone,
       settings.offsets
     );
+    console.log('[AthanContext] Prayer times calculated:', prayers.prayers.map(p => `${p.name}: ${p.timeStr}`).join(', '));
+    setDailyPrayers(prayers);
   }, [settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
 
-  const nextPrayer = useMemo<PrayerTime | null>(() => {
-    const now = new Date();
-    console.log('[AthanContext] Recalculating next prayer at', now.toLocaleTimeString());
-    const result = getNextPrayerWithTomorrow(
-      dailyPrayers.prayers,
-      settings.latitude,
-      settings.longitude,
-      settings.timezone,
-      settings.offsets
-    );
-    if (result) {
-      console.log(`[AthanContext] Next prayer: ${result.prayer.name} (tomorrow: ${result.isTomorrow})`);
-      return result.prayer;
-    }
-    return null;
-  }, [dailyPrayers, tick, settings.latitude, settings.longitude, settings.timezone, settings.offsets]);
+  useEffect(() => {
+    const updateNextPrayer = () => {
+      const now = new Date();
+      const result = getNextPrayerWithTomorrow(
+        dailyPrayers.prayers,
+        settings.latitude,
+        settings.longitude,
+        settings.timezone,
+        settings.offsets
+      );
+      if (result) {
+        setNextPrayer((prev) => {
+          if (!prev || prev.name !== result.prayer.name || prev.time.getTime() !== result.prayer.time.getTime()) {
+            console.log(`[AthanContext] Next prayer updated: ${result.prayer.name} at ${result.prayer.timeStr} (tomorrow: ${result.isTomorrow}) | now: ${now.toLocaleTimeString()}`);
+            return result.prayer;
+          }
+          return prev;
+        });
+      } else {
+        setNextPrayer(null);
+      }
+
+      const newDateKey = getDateKey();
+      if (newDateKey !== dateKey) {
+        console.log('[AthanContext] Date changed, will recalculate prayer times');
+        setDateKey(newDateKey);
+      }
+    };
+
+    updateNextPrayer();
+    const interval = setInterval(updateNextPrayer, 3000);
+    return () => clearInterval(interval);
+  }, [dailyPrayers, settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
 
   useEffect(() => {
     if (!settings.globalEnabled || Platform.OS === 'web') return;
