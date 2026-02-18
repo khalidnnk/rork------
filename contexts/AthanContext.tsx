@@ -246,38 +246,42 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const [dateKey, setDateKey] = useState<string>(getDateKey());
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayers>(() => {
     console.log('[AthanContext] Initial prayer times calculation');
+    const systemTz = getTimezoneOffset();
     return calculatePrayerTimes(
       new Date(),
       DEFAULT_SETTINGS.latitude,
       DEFAULT_SETTINGS.longitude,
-      DEFAULT_SETTINGS.timezone,
+      systemTz,
       DEFAULT_SETTINGS.offsets
     );
   });
   const [nextPrayer, setNextPrayer] = useState<PrayerTime | null>(null);
 
   useEffect(() => {
-    console.log('[AthanContext] Recalculating prayer times for dateKey:', dateKey);
+    const systemTz = getTimezoneOffset();
+    console.log('[AthanContext] Recalculating prayer times for dateKey:', dateKey, 'systemTz:', systemTz, 'settingsTz:', settings.timezone);
     const now = new Date();
     const prayers = calculatePrayerTimes(
       now,
       settings.latitude,
       settings.longitude,
-      settings.timezone,
+      systemTz,
       settings.offsets
     );
     console.log('[AthanContext] Prayer times calculated:', prayers.prayers.map(p => `${p.name}: ${p.timeStr}`).join(', '));
+    console.log('[AthanContext] Current time:', now.toLocaleTimeString());
     setDailyPrayers(prayers);
   }, [settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
 
   useEffect(() => {
     const updateNextPrayer = () => {
       const now = new Date();
+      const systemTz = getTimezoneOffset();
       const result = getNextPrayerWithTomorrow(
         dailyPrayers.prayers,
         settings.latitude,
         settings.longitude,
-        settings.timezone,
+        systemTz,
         settings.offsets
       );
       if (result) {
