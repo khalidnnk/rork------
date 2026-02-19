@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Platform, AppState } from 'react-native';
+import { Asset } from 'expo-asset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -23,7 +24,7 @@ import { DEFAULT_CITY } from '@/constants/cities';
 const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 50;
 
-const athanSource = require('@/assets/audio/athan.m4a');
+const athanAsset = require('@/assets/audio/athan.m4a');
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -92,7 +93,29 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const player = useAudioPlayer(athanSource);
+  const [resolvedSource, setResolvedSource] = useState<string | number | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      try {
+        const asset = Asset.fromModule(athanAsset);
+        asset.downloadAsync().then(() => {
+          if (asset.localUri || asset.uri) {
+            console.log('[AthanContext] Resolved audio URI for web:', asset.localUri || asset.uri);
+            setResolvedSource(asset.localUri || asset.uri);
+          }
+        }).catch((e) => {
+          console.log('[AthanContext] Failed to resolve audio asset:', e);
+        });
+      } catch (e) {
+        console.log('[AthanContext] Asset resolution error:', e);
+      }
+    } else {
+      setResolvedSource(athanAsset);
+    }
+  }, []);
+
+  const player = useAudioPlayer(resolvedSource ?? athanAsset);
   const playerStatus = useAudioPlayerStatus(player);
 
   useEffect(() => {
