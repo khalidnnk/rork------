@@ -103,10 +103,11 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
 
             <View style={styles.welcomeDivider} />
 
-            <Text style={styles.welcomeSubtext}>
-              تطبيق يُؤذّن تلقائيًا عند دخول وقت كل صلاة{'\n'}
-              بحسب تقويم أم القرى
-            </Text>
+            <Image
+              source={require('@/assets/images/icon.png')}
+              style={styles.welcomeAppIcon}
+              contentFit="cover"
+            />
 
             <TouchableOpacity
               style={styles.welcomeButton}
@@ -780,11 +781,10 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     fontWeight: '500' as const,
   },
-  welcomeSubtext: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
+  welcomeAppIcon: {
+    width: 90,
+    height: 90,
+    borderRadius: 22,
   },
   welcomeButton: {
     borderRadius: 14,
