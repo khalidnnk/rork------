@@ -19,7 +19,7 @@ import {
   requestNotificationPermissions,
   scheduleAllNotifications,
 } from '@/utils/notifications';
-import { DEFAULT_CITY } from '@/constants/cities';
+
 
 const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 50;
@@ -54,11 +54,11 @@ const DEFAULT_SETTINGS: AthanSettings = {
     maghrib: 0,
     isha: 0,
   },
-  locationName: DEFAULT_CITY.nameAr,
-  latitude: DEFAULT_CITY.latitude,
-  longitude: DEFAULT_CITY.longitude,
-  timezone: DEFAULT_CITY.timezone,
-  locationMode: 'manual' as const,
+  locationName: 'الرياض',
+  latitude: 24.7136,
+  longitude: 46.6753,
+  timezone: 3,
+  locationMode: 'auto' as const,
   hasSeenWelcome: false,
 };
 
@@ -175,9 +175,16 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     },
   });
 
+  const hasAutoDetected = useRef<boolean>(false);
+
   useEffect(() => {
     if (settingsQuery.data) {
       setSettings(settingsQuery.data);
+      if (!hasAutoDetected.current) {
+        hasAutoDetected.current = true;
+        console.log('[AthanContext] Auto-detecting GPS location on startup');
+        detectAutoLocationSilent();
+      }
     }
   }, [settingsQuery.data]);
 
@@ -242,6 +249,69 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     },
     [updateSettings]
   );
+
+  const detectAutoLocationSilent = useCallback(async () => {
+    try {
+      if (Platform.OS === 'web') {
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const lat = position.coords.latitude;
+              const lng = position.coords.longitude;
+              const tz = getTimezoneOffset();
+              let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
+              updateSettings({
+                latitude: lat,
+                longitude: lng,
+                timezone: tz,
+                locationName,
+                locationMode: 'auto',
+              });
+            },
+            () => {
+              console.log('[AthanContext] Web geolocation denied silently');
+            }
+          );
+        }
+        return;
+      }
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('[AthanContext] Location permission denied on startup');
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+      const tz = getTimezoneOffset();
+
+      let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
+      try {
+        const addresses = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (addresses.length > 0) {
+          const addr = addresses[0];
+          locationName = [addr.city, addr.country].filter(Boolean).join(', ');
+        }
+      } catch (e) {
+        console.log('[AthanContext] Reverse geocode failed:', e);
+      }
+
+      updateSettings({
+        latitude: lat,
+        longitude: lng,
+        timezone: tz,
+        locationName,
+        locationMode: 'auto',
+      });
+    } catch (e) {
+      console.error('[AthanContext] Silent location error:', e);
+    }
+  }, [updateSettings]);
 
   const detectAutoLocation = useCallback(async () => {
     setLocationLoading(true);
