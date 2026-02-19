@@ -107,7 +107,7 @@ function asrTime(
   const sp = sunPosition(jd);
   const decl = sp.declination;
   const noon = midDay(jd, tz, lng);
-  const angle = -arctan2(1, factor + tan(Math.abs(lat - decl)));
+  const angle = arctan2(1, factor + tan(Math.abs(lat - decl)));
   const cosHA = (sin(angle) - sin(lat) * sin(decl)) / (cos(lat) * cos(decl));
   if (cosHA < -1 || cosHA > 1) {
     return NaN;

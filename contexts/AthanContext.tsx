@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Platform } from 'react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +10,6 @@ import {
   PrayerTime,
   DailyPrayers,
   calculatePrayerTimes,
-  getNextPrayer,
   getNextPrayerWithTomorrow,
   getTimezoneOffset,
   getDateKey,
@@ -19,8 +18,9 @@ import {
   requestNotificationPermissions,
   scheduleAllNotifications,
 } from '@/utils/notifications';
+import { DEFAULT_CITY } from '@/constants/cities';
 
-const STORAGE_KEY = 'athan_settings_v2';
+const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 50;
 
 const athanSource = require('@/assets/audio/athan.m4a');
@@ -53,11 +53,11 @@ const DEFAULT_SETTINGS: AthanSettings = {
     maghrib: 0,
     isha: 0,
   },
-  locationName: 'جارٍ تحديد الموقع...',
-  latitude: 21.4225,
-  longitude: 39.8262,
-  timezone: 3,
-  locationMode: 'auto' as const,
+  locationName: DEFAULT_CITY.nameAr,
+  latitude: DEFAULT_CITY.latitude,
+  longitude: DEFAULT_CITY.longitude,
+  timezone: DEFAULT_CITY.timezone,
+  locationMode: 'manual' as const,
   hasSeenWelcome: false,
 };
 
@@ -87,9 +87,10 @@ async function saveSettings(settings: AthanSettings): Promise<AthanSettings> {
 export const [AthanProvider, useAthan] = createContextHook(() => {
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<AthanSettings>(DEFAULT_SETTINGS);
-  const [locationLoading, setLocationLoading] = useState<boolean>(true);
+  const [locationLoading, setLocationLoading] = useState<boolean>(false);
   const [isAdhanPlaying, setIsAdhanPlaying] = useState<boolean>(false);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const player = useAudioPlayer(athanSource);
   const playerStatus = useAudioPlayerStatus(player);
@@ -204,96 +205,90 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     updateSettings({ hasSeenWelcome: true });
   }, [updateSettings]);
 
-  useEffect(() => {
-    if (settings.locationMode !== 'auto') {
+  const setLocation = useCallback(
+    (latitude: number, longitude: number, locationName: string, timezone: number) => {
+      console.log('[AthanContext] Setting location:', locationName, latitude, longitude);
+      updateSettings({
+        latitude,
+        longitude,
+        locationName,
+        timezone,
+        locationMode: 'manual',
+      });
       setLocationLoading(false);
-      return;
-    }
+    },
+    [updateSettings]
+  );
 
-    let cancelled = false;
+  const detectAutoLocation = useCallback(async () => {
+    setLocationLoading(true);
+    try {
+      if (Platform.OS === 'web') {
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const lat = position.coords.latitude;
+              const lng = position.coords.longitude;
+              const tz = getTimezoneOffset();
+              updateSettings({
+                latitude: lat,
+                longitude: lng,
+                timezone: tz,
+                locationName: `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`,
+                locationMode: 'auto',
+              });
+              setLocationLoading(false);
+            },
+            () => {
+              console.log('[AthanContext] Web geolocation denied, using defaults');
+              setLocationLoading(false);
+            }
+          );
+        } else {
+          setLocationLoading(false);
+        }
+        return;
+      }
 
-    async function detectLocation() {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('[AthanContext] Location permission denied');
+        setLocationLoading(false);
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+      const tz = getTimezoneOffset();
+
+      let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
       try {
-        if (Platform.OS === 'web') {
-          if ('geolocation' in navigator) {
-            navigator.geolocation.getCurrentPosition(
-              async (position) => {
-                if (cancelled) return;
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                const tz = getTimezoneOffset();
-                updateSettings({
-                  latitude: lat,
-                  longitude: lng,
-                  timezone: tz,
-                  locationName: `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`,
-                });
-                setLocationLoading(false);
-              },
-              () => {
-                if (cancelled) return;
-                console.log('[AthanContext] Web geolocation denied, using defaults');
-                updateSettings({ locationName: 'مكة المكرمة' });
-                setLocationLoading(false);
-              }
-            );
-          } else {
-            updateSettings({ locationName: 'مكة المكرمة' });
-            setLocationLoading(false);
-          }
-          return;
-        }
-
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted' || cancelled) {
-          console.log('[AthanContext] Location permission denied');
-          updateSettings({ locationName: 'مكة المكرمة' });
-          setLocationLoading(false);
-          return;
-        }
-
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-
-        if (cancelled) return;
-
-        const lat = loc.coords.latitude;
-        const lng = loc.coords.longitude;
-        const tz = getTimezoneOffset();
-
-        let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
-        try {
-          const addresses = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-          if (addresses.length > 0 && !cancelled) {
-            const addr = addresses[0];
-            locationName = [addr.city, addr.country].filter(Boolean).join(', ');
-          }
-        } catch (e) {
-          console.log('[AthanContext] Reverse geocode failed:', e);
-        }
-
-        if (!cancelled) {
-          updateSettings({
-            latitude: lat,
-            longitude: lng,
-            timezone: tz,
-            locationName,
-          });
-          setLocationLoading(false);
+        const addresses = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (addresses.length > 0) {
+          const addr = addresses[0];
+          locationName = [addr.city, addr.country].filter(Boolean).join(', ');
         }
       } catch (e) {
-        console.error('[AthanContext] Location error:', e);
-        if (!cancelled) {
-          updateSettings({ locationName: 'مكة المكرمة' });
-          setLocationLoading(false);
-        }
+        console.log('[AthanContext] Reverse geocode failed:', e);
       }
-    }
 
-    detectLocation();
-    return () => { cancelled = true; };
-  }, [settings.locationMode]);
+      updateSettings({
+        latitude: lat,
+        longitude: lng,
+        timezone: tz,
+        locationName,
+        locationMode: 'auto',
+      });
+      setLocationLoading(false);
+    } catch (e) {
+      console.error('[AthanContext] Location error:', e);
+      setLocationLoading(false);
+    }
+  }, [updateSettings]);
 
   const [dateKey, setDateKey] = useState<string>(getDateKey());
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayers>(() => {
@@ -309,10 +304,10 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   });
   const [nextPrayer, setNextPrayer] = useState<PrayerTime | null>(null);
 
-  useEffect(() => {
+  const recalculatePrayers = useCallback(() => {
     const systemTz = getTimezoneOffset();
-    console.log('[AthanContext] Recalculating prayer times for dateKey:', dateKey, 'systemTz:', systemTz, 'settingsTz:', settings.timezone);
     const now = new Date();
+    console.log('[AthanContext] Recalculating prayer times | lat:', settings.latitude, 'lng:', settings.longitude, 'tz:', systemTz);
     const prayers = calculatePrayerTimes(
       now,
       settings.latitude,
@@ -320,10 +315,14 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       systemTz,
       settings.offsets
     );
-    console.log('[AthanContext] Prayer times calculated:', prayers.prayers.map(p => `${p.name}: ${p.timeStr}`).join(', '));
-    console.log('[AthanContext] Current time:', now.toLocaleTimeString());
+    console.log('[AthanContext] Prayer times:', prayers.prayers.map(p => `${p.name}: ${p.timeStr}`).join(', '));
     setDailyPrayers(prayers);
-  }, [settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
+    return prayers;
+  }, [settings.latitude, settings.longitude, settings.offsets]);
+
+  useEffect(() => {
+    recalculatePrayers();
+  }, [recalculatePrayers, dateKey]);
 
   useEffect(() => {
     const updateNextPrayer = () => {
@@ -339,7 +338,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       if (result) {
         setNextPrayer((prev) => {
           if (!prev || prev.name !== result.prayer.name || prev.time.getTime() !== result.prayer.time.getTime()) {
-            console.log(`[AthanContext] Next prayer updated: ${result.prayer.name} at ${result.prayer.timeStr} (tomorrow: ${result.isTomorrow}) | now: ${now.toLocaleTimeString()}`);
+            console.log(`[AthanContext] Next prayer: ${result.prayer.name} at ${result.prayer.timeStr} (tomorrow: ${result.isTomorrow}) | now: ${now.toLocaleTimeString()}`);
             return result.prayer;
           }
           return prev;
@@ -350,7 +349,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
       const newDateKey = getDateKey();
       if (newDateKey !== dateKey) {
-        console.log('[AthanContext] Date changed, will recalculate prayer times');
+        console.log('[AthanContext] Date changed, recalculating');
         setDateKey(newDateKey);
       }
     };
@@ -359,6 +358,29 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     const interval = setInterval(updateNextPrayer, 3000);
     return () => clearInterval(interval);
   }, [dailyPrayers, settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
+
+  useEffect(() => {
+    refreshTimerRef.current = setInterval(() => {
+      console.log('[AthanContext] Auto-refresh prayer times');
+      recalculatePrayers();
+    }, 60000);
+
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+      }
+    };
+  }, [recalculatePrayers]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        console.log('[AthanContext] App became active, refreshing prayer times');
+        recalculatePrayers();
+      }
+    });
+    return () => subscription.remove();
+  }, [recalculatePrayers]);
 
   useEffect(() => {
     if (!settings.globalEnabled || Platform.OS === 'web') return;
@@ -380,6 +402,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     setOffset,
     toggleGlobal,
     dismissWelcome,
+    setLocation,
+    detectAutoLocation,
     dailyPrayers,
     nextPrayer,
     locationLoading,
@@ -389,5 +413,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     playAthan,
     stopAthan,
     playerStatus,
+    recalculatePrayers,
   };
 });

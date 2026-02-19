@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Modal,
+  Animated,
+  FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,11 +23,16 @@ import {
   Square,
   Compass,
   Info,
+  ChevronRight,
+  Check,
+  Navigation,
+  X,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAthan } from '@/contexts/AthanContext';
 import { PrayerName } from '@/utils/prayerTimes';
+import { CITIES, City } from '@/constants/cities';
 
 const OFFSET_OPTIONS = [0, 2, 5];
 
@@ -35,6 +43,111 @@ const PRAYER_LABELS_AR: Record<PrayerName, string> = {
   maghrib: 'المغرب',
   isha: 'العشاء',
 };
+
+function CityPickerModal({
+  visible,
+  onClose,
+  onSelectCity,
+  onAutoDetect,
+  currentLat,
+  currentLng,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelectCity: (city: City) => void;
+  onAutoDetect: () => void;
+  currentLat: number;
+  currentLng: number;
+}) {
+  const insets = useSafeAreaInsets();
+
+  const isSelected = useCallback(
+    (city: City) => {
+      return (
+        Math.abs(city.latitude - currentLat) < 0.05 &&
+        Math.abs(city.longitude - currentLng) < 0.05
+      );
+    },
+    [currentLat, currentLng]
+  );
+
+  const renderCity = useCallback(
+    ({ item }: { item: City }) => {
+      const selected = isSelected(item);
+      return (
+        <TouchableOpacity
+          style={[cityStyles.cityRow, selected && cityStyles.cityRowSelected]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onSelectCity(item);
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={cityStyles.cityInfo}>
+            <Text style={[cityStyles.cityNameAr, selected && cityStyles.cityNameArSelected]}>
+              {item.nameAr}
+            </Text>
+            <Text style={cityStyles.cityNameEn}>{item.name}</Text>
+          </View>
+          {selected && <Check size={18} color={Colors.accent} />}
+        </TouchableOpacity>
+      );
+    },
+    [isSelected, onSelectCity]
+  );
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent>
+      <View style={[cityStyles.overlay]}>
+        <View style={[cityStyles.sheet, { paddingBottom: insets.bottom + 20 }]}>
+          <LinearGradient
+            colors={['#132D38', '#0F2229', '#0B1A1F']}
+            style={cityStyles.sheetGradient}
+          >
+            <View style={cityStyles.sheetHeader}>
+              <Text style={cityStyles.sheetTitle}>اختر المدينة</Text>
+              <TouchableOpacity onPress={onClose} style={cityStyles.closeButton}>
+                <X size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={cityStyles.autoDetectRow}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onAutoDetect();
+              }}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={['rgba(26,188,156,0.12)', 'rgba(26,188,156,0.04)']}
+                style={cityStyles.autoDetectGradient}
+              >
+                <Navigation size={18} color={Colors.teal} />
+                <View style={cityStyles.autoDetectText}>
+                  <Text style={cityStyles.autoDetectTitle}>تحديد تلقائي</Text>
+                  <Text style={cityStyles.autoDetectSubtitle}>استخدام GPS</Text>
+                </View>
+                <ChevronRight size={16} color={Colors.teal} />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <Text style={cityStyles.citiesLabel}>المدن</Text>
+
+            <FlatList
+              data={CITIES}
+              keyExtractor={(item) => item.name}
+              renderItem={renderCity}
+              showsVerticalScrollIndicator={false}
+              style={cityStyles.cityList}
+              ItemSeparatorComponent={() => <View style={cityStyles.separator} />}
+            />
+          </LinearGradient>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -47,7 +160,12 @@ export default function SettingsScreen() {
     playAthan,
     stopAthan,
     playerStatus,
+    setLocation,
+    detectAutoLocation,
+    locationLoading,
   } = useAthan();
+
+  const [showCityPicker, setShowCityPicker] = useState<boolean>(false);
 
   const handlePlayStopAthan = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -79,6 +197,19 @@ export default function SettingsScreen() {
     toggleGlobal();
   }, [toggleGlobal]);
 
+  const handleSelectCity = useCallback(
+    (city: City) => {
+      setLocation(city.latitude, city.longitude, city.nameAr, city.timezone);
+      setShowCityPicker(false);
+    },
+    [setLocation]
+  );
+
+  const handleAutoDetect = useCallback(() => {
+    detectAutoLocation();
+    setShowCityPicker(false);
+  }, [detectAutoLocation]);
+
   const prayerNames: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 
   const progressPercent = useMemo(() => {
@@ -99,6 +230,16 @@ export default function SettingsScreen() {
         colors={['#0F2229', '#0B1A1F', '#091418']}
         style={StyleSheet.absoluteFill}
       />
+
+      <CityPickerModal
+        visible={showCityPicker}
+        onClose={() => setShowCityPicker(false)}
+        onSelectCity={handleSelectCity}
+        onAutoDetect={handleAutoDetect}
+        currentLat={settings.latitude}
+        currentLng={settings.longitude}
+      />
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -278,18 +419,25 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>الموقع</Text>
           <View style={styles.card}>
-            <View style={styles.cardRow}>
+            <TouchableOpacity
+              style={styles.cardRow}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowCityPicker(true);
+              }}
+              activeOpacity={0.7}
+            >
               <View style={styles.cardRowLeft}>
                 <MapPin size={18} color={Colors.accent} />
                 <View style={styles.cardRowTextWrap}>
                   <Text style={styles.cardRowTitle}>الموقع الحالي</Text>
-                  <Text style={styles.cardRowSubtitle}>{settings.locationName}</Text>
+                  <Text style={styles.cardRowSubtitle}>
+                    {locationLoading ? 'جارٍ تحديد الموقع...' : settings.locationName}
+                  </Text>
                 </View>
               </View>
-              <View style={styles.autoLabel}>
-                <Text style={styles.autoLabelText}>تلقائي</Text>
-              </View>
-            </View>
+              <ChevronRight size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
 
             <View style={styles.divider} />
 
@@ -350,6 +498,115 @@ export default function SettingsScreen() {
     </View>
   );
 }
+
+const cityStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    maxHeight: '80%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  sheetGradient: {
+    flex: 1,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: Colors.text,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  autoDetectRow: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  autoDetectGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(26,188,156,0.2)',
+  },
+  autoDetectText: {
+    flex: 1,
+  },
+  autoDetectTitle: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: Colors.teal,
+  },
+  autoDetectSubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  citiesLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: Colors.textMuted,
+    marginBottom: 10,
+    writingDirection: 'rtl',
+    textAlign: 'right',
+  },
+  cityList: {
+    flex: 1,
+  },
+  cityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+  },
+  cityRowSelected: {
+    backgroundColor: Colors.accentDim,
+    borderWidth: 1,
+    borderColor: 'rgba(201,168,76,0.25)',
+  },
+  cityInfo: {
+    gap: 2,
+  },
+  cityNameAr: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.text,
+  },
+  cityNameArSelected: {
+    color: Colors.accentLight,
+  },
+  cityNameEn: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  separator: {
+    height: 6,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -532,17 +789,6 @@ const styles = StyleSheet.create({
   },
   offsetChipTextActive: {
     color: Colors.accent,
-  },
-  autoLabel: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: Colors.successDim,
-  },
-  autoLabelText: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: Colors.success,
   },
   activeLabel: {
     paddingHorizontal: 10,
