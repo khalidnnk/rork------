@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import {
   MapPin,
   Bell,
@@ -23,7 +24,6 @@ import {
   CloudSun,
   Volume2,
   VolumeX,
-  X,
   Heart,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -37,14 +37,6 @@ const PRAYER_ICONS: Record<PrayerName, React.ComponentType<{ size: number; color
   asr: CloudSun,
   maghrib: Sunset,
   isha: Moon,
-};
-
-const PRAYER_EMOJI: Record<PrayerName, string> = {
-  fajr: '🌅',
-  dhuhr: '☀️',
-  asr: '🌤',
-  maghrib: '🌇',
-  isha: '🌙',
 };
 
 function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
@@ -146,7 +138,7 @@ export default function HomeScreen() {
     locationLoading,
     toggleGlobal,
     isAdhanPlaying,
-    setIsAdhanPlaying,
+    stopAthan,
     dismissWelcome,
   } = useAthan();
 
@@ -238,8 +230,8 @@ export default function HomeScreen() {
 
   const handleStopAdhan = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsAdhanPlaying(false);
-  }, [setIsAdhanPlaying]);
+    stopAthan();
+  }, [stopAthan]);
 
   const handleToggleGlobal = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -280,9 +272,16 @@ export default function HomeScreen() {
       >
         <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
           <View style={styles.headerTop}>
-            <View style={styles.appTitle}>
-              <Text style={styles.titleTextAr}>أذان السليماني</Text>
-              <Text style={styles.subtitleText}>Alsulaimani Athan</Text>
+            <View style={styles.appTitleRow}>
+              <Image
+                source={require('@/assets/images/icon.png')}
+                style={styles.appIcon}
+                contentFit="cover"
+              />
+              <View style={styles.appTitle}>
+                <Text style={styles.titleTextAr}>أذان السليماني</Text>
+                <Text style={styles.subtitleText}>Alsulaimani Athan</Text>
+              </View>
             </View>
             <TouchableOpacity
               style={[
@@ -459,12 +458,6 @@ export default function HomeScreen() {
             );
           })}
         </View>
-
-        <View style={styles.noteCard}>
-          <Text style={styles.noteText}>
-            ملاحظة: نظام iOS يحدّ مدة صوت الإشعار بـ 30 ثانية. سيتم تشغيل صوت الأذان المرفق عند دخول وقت الصلاة.
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -489,6 +482,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 14,
+  },
+  appTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  appIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
   },
   appTitle: {
     flexDirection: 'column',
@@ -722,20 +725,6 @@ const styles = StyleSheet.create({
   },
   prayerTimePast: {
     color: Colors.textMuted,
-  },
-  noteCard: {
-    backgroundColor: Colors.accentSoft,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.1)',
-  },
-  noteText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-    textAlign: 'right',
-    writingDirection: 'rtl',
   },
   welcomeOverlay: {
     flex: 1,

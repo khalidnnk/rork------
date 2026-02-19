@@ -44,7 +44,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       name: 'Athan Alerts',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      sound: 'default',
+      sound: 'athan.m4r',
     });
   }
 
@@ -71,7 +71,7 @@ export async function scheduleAthanNotification(
       content: {
         title: `حان وقت صلاة ${prayer.labelAr}`,
         body: `${prayer.label} - ${prayer.timeStr}`,
-        sound: true,
+        sound: 'athan.m4r',
         priority: Notifications.AndroidNotificationPriority.MAX,
         ...(Platform.OS === 'android' ? { channelId: 'athan' } : {}),
         data: { prayerName: prayer.name, time: prayer.timeStr },

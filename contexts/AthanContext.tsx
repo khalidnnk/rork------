@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import {
   PrayerName,
   PrayerTime,
@@ -20,6 +21,9 @@ import {
 } from '@/utils/notifications';
 
 const STORAGE_KEY = 'athan_settings_v2';
+const ATHAN_MAX_DURATION = 50;
+
+const athanSource = require('@/assets/audio/athan.m4r');
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -85,6 +89,54 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const [settings, setSettings] = useState<AthanSettings>(DEFAULT_SETTINGS);
   const [locationLoading, setLocationLoading] = useState<boolean>(true);
   const [isAdhanPlaying, setIsAdhanPlaying] = useState<boolean>(false);
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const player = useAudioPlayer(athanSource);
+  const playerStatus = useAudioPlayerStatus(player);
+
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+    }).catch((e) => console.log('[AthanContext] setAudioModeAsync error:', e));
+  }, []);
+
+  useEffect(() => {
+    if (playerStatus.didJustFinish) {
+      console.log('[AthanContext] Athan playback finished');
+      setIsAdhanPlaying(false);
+      if (stopTimerRef.current) {
+        clearTimeout(stopTimerRef.current);
+        stopTimerRef.current = null;
+      }
+    }
+  }, [playerStatus.didJustFinish]);
+
+  const playAthan = useCallback(() => {
+    console.log('[AthanContext] Playing athan');
+    player.seekTo(0);
+    player.play();
+    setIsAdhanPlaying(true);
+
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current);
+    }
+    stopTimerRef.current = setTimeout(() => {
+      console.log('[AthanContext] Auto-stopping athan after', ATHAN_MAX_DURATION, 'seconds');
+      player.pause();
+      setIsAdhanPlaying(false);
+      stopTimerRef.current = null;
+    }, ATHAN_MAX_DURATION * 1000);
+  }, [player]);
+
+  const stopAthan = useCallback(() => {
+    console.log('[AthanContext] Stopping athan');
+    player.pause();
+    setIsAdhanPlaying(false);
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+  }, [player]);
 
   const settingsQuery = useQuery({
     queryKey: ['athan-settings'],
@@ -334,5 +386,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     isLoading: settingsQuery.isLoading,
     isAdhanPlaying,
     setIsAdhanPlaying,
+    playAthan,
+    stopAthan,
+    playerStatus,
   };
 });

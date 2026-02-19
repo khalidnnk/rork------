@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,9 +17,9 @@ import {
   Clock,
   Volume2,
   Play,
-  ChevronRight,
-  Info,
+  Square,
   Compass,
+  Info,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -44,19 +43,20 @@ export default function SettingsScreen() {
     togglePrayer,
     setOffset,
     toggleGlobal,
-    setIsAdhanPlaying,
+    isAdhanPlaying,
+    playAthan,
+    stopAthan,
+    playerStatus,
   } = useAthan();
 
-  const handleTestAlarm = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setIsAdhanPlaying(true);
-
-    Alert.alert(
-      'اختبار المنبّه',
-      'تم تفعيل الأذان التجريبي! انتقل للصفحة الرئيسية لرؤية زر الإيقاف.\n\nعند دخول وقت الصلاة، سيعمل صوت الأذان المرفق (athan.m4r) كإشعار تلقائي.',
-      [{ text: 'حسنًا' }]
-    );
-  }, [setIsAdhanPlaying]);
+  const handlePlayStopAthan = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (isAdhanPlaying) {
+      stopAthan();
+    } else {
+      playAthan();
+    }
+  }, [isAdhanPlaying, playAthan, stopAthan]);
 
   const handleTogglePrayer = useCallback(
     (name: PrayerName) => {
@@ -80,6 +80,18 @@ export default function SettingsScreen() {
   }, [toggleGlobal]);
 
   const prayerNames: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
+  const progressPercent = useMemo(() => {
+    if (!playerStatus.duration || playerStatus.duration <= 0) return 0;
+    const maxDuration = Math.min(playerStatus.duration, 50);
+    return Math.min((playerStatus.currentTime / maxDuration) * 100, 100);
+  }, [playerStatus.currentTime, playerStatus.duration]);
+
+  const formatTime = useCallback((seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -125,24 +137,68 @@ export default function SettingsScreen() {
                 testID="global-switch"
               />
             </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>تشغيل الأذان</Text>
+          <View style={styles.card}>
+            <View style={styles.athanPlayerWrap}>
+              <TouchableOpacity
+                style={[
+                  styles.playStopButton,
+                  isAdhanPlaying && styles.playStopButtonActive,
+                ]}
+                onPress={handlePlayStopAthan}
+                activeOpacity={0.7}
+                testID="play-stop-athan"
+              >
+                <LinearGradient
+                  colors={isAdhanPlaying ? [Colors.danger, '#C0392B'] : [Colors.accent, '#B8922E']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.playStopGradient}
+                >
+                  {isAdhanPlaying ? (
+                    <Square size={20} color="#FFF" fill="#FFF" />
+                  ) : (
+                    <Play size={20} color="#0B1A1F" fill="#0B1A1F" />
+                  )}
+                  <Text style={[styles.playStopText, isAdhanPlaying && styles.playStopTextActive]}>
+                    {isAdhanPlaying ? 'إيقاف الأذان' : 'تشغيل الأذان'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {isAdhanPlaying && (
+                <View style={styles.progressWrap}>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+                  </View>
+                  <View style={styles.progressTimeRow}>
+                    <Text style={styles.progressTime}>{formatTime(playerStatus.currentTime)}</Text>
+                    <Text style={styles.progressTime}>0:50</Text>
+                  </View>
+                </View>
+              )}
+            </View>
 
             <View style={styles.divider} />
 
-            <TouchableOpacity
-              style={styles.cardRow}
-              onPress={handleTestAlarm}
-              activeOpacity={0.7}
-              testID="test-alarm"
-            >
+            <View style={styles.cardRow}>
               <View style={styles.cardRowLeft}>
-                <Play size={18} color={Colors.accent} />
+                <Volume2 size={18} color={Colors.accent} />
                 <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>اختبار المنبّه</Text>
-                  <Text style={styles.cardRowSubtitle}>معاينة صوت الأذان</Text>
+                  <Text style={styles.cardRowTitle}>athan.m4r</Text>
+                  <Text style={styles.cardRowSubtitle}>
+                    ملف الأذان المرفق مع التطبيق (أول 50 ثانية)
+                  </Text>
                 </View>
               </View>
-              <ChevronRight size={18} color={Colors.textMuted} />
-            </TouchableOpacity>
+              <View style={styles.activeLabel}>
+                <Text style={styles.activeLabelText}>مُفعّل</Text>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -285,36 +341,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>صوت الأذان</Text>
-          <View style={styles.card}>
-            <View style={styles.cardRow}>
-              <View style={styles.cardRowLeft}>
-                <Volume2 size={18} color={Colors.accent} />
-                <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>athan.m4r</Text>
-                  <Text style={styles.cardRowSubtitle}>
-                    ملف الأذان المرفق مع التطبيق
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.activeLabel}>
-                <Text style={styles.activeLabelText}>مُفعّل</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.infoCard}>
-          <Info size={16} color={Colors.accent} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>حول الإشعارات</Text>
-            <Text style={styles.infoText}>
-              يحدّ نظام iOS مدة صوت الإشعار بـ 30 ثانية. عند دخول وقت الصلاة، ستتلقى إشعارًا عالي الأولوية مع صوت الأذان المرفق. يتم إعادة جدولة الإشعارات يوميًا.
-            </Text>
-          </View>
-        </View>
-
         <View style={styles.dedicationCard}>
           <Text style={styles.dedicationText}>
             ليبقى أثر صوته حاضرًا
@@ -405,6 +431,55 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.separator,
     marginHorizontal: 16,
   },
+  athanPlayerWrap: {
+    padding: 16,
+  },
+  playStopButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  playStopButtonActive: {},
+  playStopGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+  },
+  playStopText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#0B1A1F',
+  },
+  playStopTextActive: {
+    color: '#FFF',
+  },
+  progressWrap: {
+    marginTop: 14,
+  },
+  progressBarBg: {
+    height: 4,
+    backgroundColor: Colors.surface,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: 4,
+    backgroundColor: Colors.accent,
+    borderRadius: 2,
+  },
+  progressTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  progressTime: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontVariant: ['tabular-nums'] as const,
+  },
   prayerToggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -490,34 +565,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600' as const,
     color: Colors.textMuted,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: Colors.accentSoft,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.1)',
-    marginBottom: 20,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.accent,
-    marginBottom: 4,
-    writingDirection: 'rtl',
-    textAlign: 'right',
-  },
-  infoText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-    writingDirection: 'rtl',
-    textAlign: 'right',
   },
   dedicationCard: {
     alignItems: 'center',
