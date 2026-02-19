@@ -17,7 +17,7 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600' as const,
+          fontFamily: 'Dubai-Medium',
         },
       }}
     >

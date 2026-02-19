@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 26,
-    fontWeight: '700' as const,
+    fontFamily: 'Dubai-Bold',
     color: Colors.text,
   },
   section: {
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.textMuted,
     marginBottom: 8,
     marginLeft: 4,
@@ -410,6 +410,7 @@ const styles = StyleSheet.create({
   },
   sectionDescription: {
     fontSize: 12,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textSecondary,
     marginBottom: 8,
     marginRight: 4,
@@ -441,11 +442,12 @@ const styles = StyleSheet.create({
   },
   cardRowTitle: {
     fontSize: 15,
-    fontWeight: '500' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.text,
   },
   cardRowSubtitle: {
     fontSize: 12,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textSecondary,
     marginTop: 1,
   },
@@ -473,7 +475,7 @@ const styles = StyleSheet.create({
   },
   playStopText: {
     fontSize: 16,
-    fontWeight: '700' as const,
+    fontFamily: 'Dubai-Bold',
     color: '#0B1A1F',
   },
   playStopTextActive: {
@@ -500,6 +502,7 @@ const styles = StyleSheet.create({
   },
   progressTime: {
     fontSize: 11,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textMuted,
     fontVariant: ['tabular-nums'] as const,
   },
@@ -517,7 +520,7 @@ const styles = StyleSheet.create({
   },
   prayerToggleName: {
     fontSize: 15,
-    fontWeight: '500' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.text,
   },
   offsetRow: {
@@ -529,7 +532,7 @@ const styles = StyleSheet.create({
   },
   offsetPrayerName: {
     fontSize: 15,
-    fontWeight: '500' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.text,
   },
   offsetOptions: {
@@ -550,7 +553,7 @@ const styles = StyleSheet.create({
   },
   offsetChipText: {
     fontSize: 12,
-    fontWeight: '500' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.textSecondary,
   },
   offsetChipTextActive: {
@@ -564,7 +567,7 @@ const styles = StyleSheet.create({
   },
   activeLabelText: {
     fontSize: 11,
-    fontWeight: '600' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.accent,
   },
   lockedLabel: {
@@ -575,7 +578,7 @@ const styles = StyleSheet.create({
   },
   lockedLabelText: {
     fontSize: 11,
-    fontWeight: '600' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.textMuted,
   },
   dedicationCard: {
@@ -585,8 +588,8 @@ const styles = StyleSheet.create({
   },
   dedicationText: {
     fontSize: 14,
+    fontFamily: 'Dubai-Medium',
     color: Colors.accent,
-    fontWeight: '500' as const,
     fontStyle: 'italic',
     opacity: 0.7,
   },
@@ -600,7 +603,7 @@ const styles = StyleSheet.create({
   },
   refreshLocationText: {
     fontSize: 14,
-    fontWeight: '600' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.teal,
   },
 });

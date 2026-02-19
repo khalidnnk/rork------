@@ -611,13 +611,13 @@ const styles = StyleSheet.create({
   },
   titleTextAr: {
     fontSize: 26,
-    fontWeight: '700' as const,
+    fontFamily: 'Dubai-Bold',
     color: Colors.text,
     writingDirection: 'rtl',
   },
   subtitleText: {
     fontSize: 13,
-    fontWeight: '500' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.accent,
     letterSpacing: 1.5,
     marginTop: 2,
@@ -639,10 +639,12 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 13,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textSecondary,
   },
   dateText: {
     fontSize: 13,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textMuted,
     writingDirection: 'rtl',
   },
@@ -661,7 +663,7 @@ const styles = StyleSheet.create({
   },
   stopAdhanText: {
     fontSize: 18,
-    fontWeight: '700' as const,
+    fontFamily: 'Dubai-Bold',
     color: '#0B1A1F',
   },
   countdownCard: {
@@ -683,17 +685,18 @@ const styles = StyleSheet.create({
   },
   countdownLabel: {
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.accent,
     letterSpacing: 0.5,
   },
   countdownPrayerAr: {
     fontSize: 28,
-    fontWeight: '700' as const,
+    fontFamily: 'Dubai-Bold',
     color: Colors.text,
   },
   countdownPrayerEn: {
     fontSize: 14,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textSecondary,
     marginTop: 2,
     marginBottom: 18,
@@ -718,24 +721,26 @@ const styles = StyleSheet.create({
   },
   timerNumber: {
     fontSize: 32,
-    fontWeight: '300' as const,
+    fontFamily: 'Dubai-Light',
     color: Colors.text,
     fontVariant: ['tabular-nums'],
   },
   timerUnit: {
     fontSize: 10,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textMuted,
     marginTop: 4,
   },
   timerColon: {
     fontSize: 28,
-    fontWeight: '200' as const,
+    fontFamily: 'Dubai-Light',
     color: Colors.textMuted,
     marginHorizontal: 8,
     marginTop: -16,
   },
   countdownTime: {
     fontSize: 14,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textSecondary,
     fontVariant: ['tabular-nums'],
   },
@@ -747,11 +752,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '600' as const,
+    fontFamily: 'Dubai-Bold',
     color: Colors.text,
   },
   sectionSubtitle: {
     fontSize: 11,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textMuted,
   },
   prayerList: {
@@ -805,11 +811,12 @@ const styles = StyleSheet.create({
   },
   prayerNameAr: {
     fontSize: 16,
-    fontWeight: '600' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.text,
   },
   prayerNameEn: {
     fontSize: 12,
+    fontFamily: 'Dubai-Regular',
     color: Colors.textSecondary,
   },
   prayerNameActive: {
@@ -820,8 +827,8 @@ const styles = StyleSheet.create({
   },
   offsetBadge: {
     fontSize: 10,
+    fontFamily: 'Dubai-Medium',
     color: Colors.accent,
-    fontWeight: '500' as const,
   },
   prayerRight: {
     alignItems: 'flex-end',
@@ -829,7 +836,7 @@ const styles = StyleSheet.create({
   },
   prayerTime: {
     fontSize: 15,
-    fontWeight: '600' as const,
+    fontFamily: 'Dubai-Medium',
     color: Colors.text,
     fontVariant: ['tabular-nums'],
   },
@@ -869,6 +876,7 @@ const styles = StyleSheet.create({
   },
   welcomeBismillah: {
     fontSize: 16,
+    fontFamily: 'Dubai-Regular',
     color: Colors.accent,
     marginBottom: 16,
     textAlign: 'center',
@@ -881,17 +889,17 @@ const styles = StyleSheet.create({
   },
   welcomeTitle: {
     fontSize: 24,
-    fontWeight: '700' as const,
+    fontFamily: 'Dubai-Bold',
     color: Colors.text,
     marginBottom: 14,
     textAlign: 'center',
   },
   welcomeMessage: {
     fontSize: 17,
+    fontFamily: 'Dubai-Medium',
     color: Colors.accentLight,
     textAlign: 'center',
     lineHeight: 28,
-    fontWeight: '500' as const,
   },
   welcomeAppIcon: {
     width: 90,
@@ -910,7 +918,7 @@ const styles = StyleSheet.create({
   },
   welcomeButtonText: {
     fontSize: 17,
-    fontWeight: '700' as const,
+    fontFamily: 'Dubai-Bold',
     color: '#0B1A1F',
   },
   headerActions: {
@@ -930,18 +938,18 @@ const styles = StyleSheet.create({
   },
   aboutMessage: {
     fontSize: 17,
+    fontFamily: 'Dubai-Medium',
     color: Colors.accentLight,
     textAlign: 'center',
     lineHeight: 30,
-    fontWeight: '500' as const,
     marginBottom: 4,
   },
   aboutDua: {
     fontSize: 16,
+    fontFamily: 'Dubai-Bold',
     color: Colors.accent,
     textAlign: 'center',
     lineHeight: 28,
-    fontWeight: '600' as const,
     marginBottom: 16,
   },
 });
