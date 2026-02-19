@@ -23,7 +23,7 @@ import {
 const STORAGE_KEY = 'athan_settings_v2';
 const ATHAN_MAX_DURATION = 50;
 
-const athanSource = require('@/assets/audio/athan.m4r');
+const athanSource = require('@/assets/audio/athan.m4a');
 
 export interface AthanSettings {
   globalEnabled: boolean;
