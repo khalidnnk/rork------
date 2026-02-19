@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
-  Platform,
   Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,157 +25,11 @@ import {
   VolumeX,
   Heart,
   Info,
-  Play,
-  Square,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAthan } from '@/contexts/AthanContext';
 import { getTimeUntil, PrayerName } from '@/utils/prayerTimes';
-
-function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean; onStop: () => void; playerStatus: { currentTime: number; duration: number; playing: boolean } }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const waveAnim1 = useRef(new Animated.Value(1)).current;
-  const waveAnim2 = useRef(new Animated.Value(1)).current;
-  const waveAnim3 = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0.3)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      fadeAnim.setValue(0);
-      scaleAnim.setValue(0.8);
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, friction: 7, tension: 40, useNativeDriver: true }),
-      ]).start();
-
-      const wave1 = Animated.loop(
-        Animated.sequence([
-          Animated.timing(waveAnim1, { toValue: 1.3, duration: 1500, useNativeDriver: true }),
-          Animated.timing(waveAnim1, { toValue: 1, duration: 1500, useNativeDriver: true }),
-        ])
-      );
-      const wave2 = Animated.loop(
-        Animated.sequence([
-          Animated.timing(waveAnim2, { toValue: 1.5, duration: 2000, useNativeDriver: true }),
-          Animated.timing(waveAnim2, { toValue: 1, duration: 2000, useNativeDriver: true }),
-        ])
-      );
-      const wave3 = Animated.loop(
-        Animated.sequence([
-          Animated.timing(waveAnim3, { toValue: 1.7, duration: 2500, useNativeDriver: true }),
-          Animated.timing(waveAnim3, { toValue: 1, duration: 2500, useNativeDriver: true }),
-        ])
-      );
-      const glow = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, { toValue: 0.7, duration: 1200, useNativeDriver: true }),
-          Animated.timing(glowAnim, { toValue: 0.3, duration: 1200, useNativeDriver: true }),
-        ])
-      );
-      const rotate = Animated.loop(
-        Animated.timing(rotateAnim, { toValue: 1, duration: 20000, useNativeDriver: true })
-      );
-
-      wave1.start();
-      wave2.start();
-      wave3.start();
-      glow.start();
-      rotate.start();
-
-      return () => {
-        wave1.stop();
-        wave2.stop();
-        wave3.stop();
-        glow.stop();
-        rotate.stop();
-      };
-    }
-  }, [visible]);
-
-  const handleStop = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 0.8, duration: 300, useNativeDriver: true }),
-    ]).start(() => {
-      onStop();
-    });
-  }, [onStop, fadeAnim, scaleAnim]);
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const progress = playerStatus.duration > 0 ? playerStatus.currentTime / playerStatus.duration : 0;
-  const elapsed = Math.floor(playerStatus.currentTime);
-  const total = Math.floor(playerStatus.duration);
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
-
-  return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-      <Animated.View style={[athanStyles.overlay, { opacity: fadeAnim }]}>
-        <LinearGradient
-          colors={['#0B1A1F', '#091418', '#060E12']}
-          style={StyleSheet.absoluteFill}
-        />
-        <Animated.View style={[athanStyles.content, { transform: [{ scale: scaleAnim }] }]}>
-          <Animated.View style={[athanStyles.waveRing, athanStyles.waveRing3, { transform: [{ scale: waveAnim3 }], opacity: glowAnim }]} />
-          <Animated.View style={[athanStyles.waveRing, athanStyles.waveRing2, { transform: [{ scale: waveAnim2 }], opacity: glowAnim }]} />
-          <Animated.View style={[athanStyles.waveRing, athanStyles.waveRing1, { transform: [{ scale: waveAnim1 }], opacity: glowAnim }]} />
-
-          <Animated.View style={[athanStyles.iconOuter, { transform: [{ rotate: spin }] }]}>
-            <LinearGradient
-              colors={['rgba(201,168,76,0.15)', 'rgba(201,168,76,0.05)']}
-              style={athanStyles.iconOuterGradient}
-            />
-          </Animated.View>
-
-          <View style={athanStyles.iconCenter}>
-            <Image
-              source={require('@/assets/images/icon.png')}
-              style={athanStyles.athanIcon}
-              contentFit="cover"
-            />
-          </View>
-
-          <Text style={athanStyles.playingLabel}>جارٍ تشغيل الأذان</Text>
-          <Text style={athanStyles.playingBismillah}>الله أكبر الله أكبر</Text>
-
-          <View style={athanStyles.progressContainer}>
-            <View style={athanStyles.progressBar}>
-              <View style={[athanStyles.progressFill, { width: `${progress * 100}%` }]} />
-            </View>
-            <View style={athanStyles.timeRow}>
-              <Text style={athanStyles.timeText}>{formatTime(elapsed)}</Text>
-              <Text style={athanStyles.timeText}>{formatTime(total)}</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={athanStyles.stopButton}
-            onPress={handleStop}
-            activeOpacity={0.8}
-            testID="stop-athan-modal"
-          >
-            <LinearGradient
-              colors={['#E74C3C', '#C0392B']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={athanStyles.stopButtonGradient}
-            >
-              <Square size={22} color="#fff" fill="#fff" />
-              <Text style={athanStyles.stopButtonText}>إيقاف الأذان</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
-  );
-}
 
 const PRAYER_ICONS: Record<PrayerName, React.ComponentType<{ size: number; color: string }>> = {
   fajr: Sunrise,
@@ -381,17 +234,12 @@ export default function HomeScreen() {
     nextPrayer,
     locationLoading,
     toggleGlobal,
-    isAdhanPlaying,
-    playAthan,
-    stopAthan,
     dismissWelcome,
-    playerStatus,
   } = useAthan();
 
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 });
   const [showAbout, setShowAbout] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnims = useRef(
     dailyPrayers.prayers.map(() => new Animated.Value(40))
@@ -455,36 +303,6 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [nextPrayer]);
 
-  useEffect(() => {
-    if (!isAdhanPlaying) return;
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.06,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, [isAdhanPlaying]);
-
-  const handlePlayAthan = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    playAthan();
-  }, [playAthan]);
-
-  const handleStopAdhan = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    stopAthan();
-  }, [stopAthan]);
-
   const handleToggleGlobal = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleGlobal();
@@ -514,16 +332,6 @@ export default function HomeScreen() {
 
       <WelcomeModal visible={showWelcome} onDismiss={handleDismissWelcome} />
       <AboutModal visible={showAbout} onDismiss={() => setShowAbout(false)} />
-      <AthanPlayerModal
-        visible={isAdhanPlaying}
-        onStop={handleStopAdhan}
-        playerStatus={{
-          currentTime: playerStatus.currentTime ?? 0,
-          duration: playerStatus.duration ?? 0,
-          playing: playerStatus.playing ?? false,
-        }}
-      />
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -583,23 +391,6 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.dateText}>{dateStr}</Text>
         </Animated.View>
-
-        <TouchableOpacity
-          style={styles.playAthanCard}
-          onPress={handlePlayAthan}
-          activeOpacity={0.8}
-          testID="play-athan"
-        >
-          <LinearGradient
-            colors={[Colors.accent, '#B8922E']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.playAthanGradient}
-          >
-            <Play size={22} color="#0B1A1F" fill="#0B1A1F" />
-            <Text style={styles.playAthanText}>تشغيل الأذان</Text>
-          </LinearGradient>
-        </TouchableOpacity>
 
         {nextPrayer && (
           <Animated.View style={[styles.countdownCard, { opacity: fadeAnim, transform: [{ scale: countdownScale }] }]}>
@@ -805,24 +596,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Dubai-Regular',
     color: Colors.textMuted,
     writingDirection: 'rtl',
-  },
-  playAthanCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
-  playAthanGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-  },
-  playAthanText: {
-    fontSize: 18,
-    fontFamily: 'Dubai-Bold',
-    color: '#0B1A1F',
   },
   countdownCard: {
     borderRadius: 20,
@@ -1109,124 +882,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 28,
     marginBottom: 16,
-  },
-});
-
-const athanStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    alignItems: 'center',
-    width: '100%',
-    paddingHorizontal: 40,
-  },
-  waveRing: {
-    position: 'absolute',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.2)',
-  },
-  waveRing1: {
-    width: 180,
-    height: 180,
-    backgroundColor: 'rgba(201,168,76,0.04)',
-  },
-  waveRing2: {
-    width: 260,
-    height: 260,
-    backgroundColor: 'rgba(201,168,76,0.02)',
-  },
-  waveRing3: {
-    width: 340,
-    height: 340,
-    backgroundColor: 'rgba(201,168,76,0.01)',
-  },
-  iconOuter: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    overflow: 'hidden',
-  },
-  iconOuterGradient: {
-    flex: 1,
-    borderRadius: 80,
-    borderWidth: 1.5,
-    borderColor: 'rgba(201,168,76,0.25)',
-    borderStyle: 'dashed',
-  },
-  iconCenter: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: Colors.accent,
-    marginBottom: 36,
-  },
-  athanIcon: {
-    width: '100%',
-    height: '100%',
-  },
-  playingLabel: {
-    fontSize: 14,
-    fontFamily: 'Dubai-Medium',
-    color: Colors.accent,
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  playingBismillah: {
-    fontSize: 28,
-    fontFamily: 'Dubai-Bold',
-    color: Colors.text,
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  progressContainer: {
-    width: '100%',
-    marginBottom: 40,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: 'rgba(201,168,76,0.15)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.accent,
-    borderRadius: 2,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  timeText: {
-    fontSize: 12,
-    fontFamily: 'Dubai-Regular',
-    color: Colors.textMuted,
-    fontVariant: ['tabular-nums'] as const,
-  },
-  stopButton: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    width: '80%',
-  },
-  stopButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-  },
-  stopButtonText: {
-    fontSize: 18,
-    fontFamily: 'Dubai-Bold',
-    color: '#fff',
   },
 });
