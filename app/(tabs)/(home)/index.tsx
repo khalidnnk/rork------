@@ -25,6 +25,7 @@ import {
   Volume2,
   VolumeX,
   Heart,
+  Info,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -38,6 +39,102 @@ const PRAYER_ICONS: Record<PrayerName, React.ComponentType<{ size: number; color
   maghrib: Sunset,
   isha: Moon,
 };
+
+function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const aboutFadeAnim = useRef(new Animated.Value(0)).current;
+  const aboutScaleAnim = useRef(new Animated.Value(0.9)).current;
+
+  useEffect(() => {
+    if (visible) {
+      aboutFadeAnim.setValue(0);
+      aboutScaleAnim.setValue(0.9);
+      Animated.parallel([
+        Animated.timing(aboutFadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.spring(aboutScaleAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleDismiss = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(aboutFadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(aboutScaleAnim, {
+        toValue: 0.9,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onDismiss();
+    });
+  }, [onDismiss, aboutFadeAnim, aboutScaleAnim]);
+
+  return (
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+      <Animated.View style={[styles.welcomeOverlay, { opacity: aboutFadeAnim }]}>
+        <Animated.View style={[styles.welcomeCard, { transform: [{ scale: aboutScaleAnim }] }]}>
+          <LinearGradient
+            colors={['#132D38', '#0F2229', '#0B1A1F']}
+            style={styles.welcomeGradient}
+          >
+            <View style={styles.welcomeIconWrap}>
+              <Heart size={32} color={Colors.accent} fill={Colors.accent} />
+            </View>
+
+            <Text style={styles.welcomeBismillah}>بسم الله الرحمن الرحيم</Text>
+
+            <View style={styles.welcomeDivider} />
+
+            <Text style={styles.welcomeTitle}>عن التطبيق</Text>
+
+            <Text style={styles.aboutMessage}>
+              تم إنشاء هذا التطبيق احتساباً للأجر عن عبدالرحمن السليماني
+            </Text>
+
+            <View style={styles.welcomeDivider} />
+
+            <Text style={styles.aboutDua}>
+              اللهم اجعل له أجراً ومغفرة بكل (الله أكبر) ترفع في هذا التطبيق
+            </Text>
+
+            <Image
+              source={require('@/assets/images/icon.png')}
+              style={styles.welcomeAppIcon}
+              contentFit="cover"
+            />
+
+            <TouchableOpacity
+              style={styles.welcomeButton}
+              onPress={handleDismiss}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[Colors.accent, '#B8922E']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.welcomeButtonGradient}
+              >
+                <Text style={styles.welcomeButtonText}>إغلاق</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </LinearGradient>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+}
 
 function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -144,6 +241,7 @@ export default function HomeScreen() {
   } = useAthan();
 
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 });
+  const [showAbout, setShowAbout] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -262,6 +360,7 @@ export default function HomeScreen() {
       />
 
       <WelcomeModal visible={showWelcome} onDismiss={handleDismissWelcome} />
+      <AboutModal visible={showAbout} onDismiss={() => setShowAbout(false)} />
 
       <ScrollView
         style={styles.scrollView}
@@ -284,21 +383,34 @@ export default function HomeScreen() {
                 <Text style={styles.subtitleText}>Alsulaimani Athan</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={[
-                styles.globalToggle,
-                { backgroundColor: settings.globalEnabled ? Colors.accentDim : Colors.dangerDim },
-              ]}
-              onPress={handleToggleGlobal}
-              activeOpacity={0.7}
-              testID="global-toggle"
-            >
-              {settings.globalEnabled ? (
-                <Bell size={18} color={Colors.accent} />
-              ) : (
-                <BellOff size={18} color={Colors.danger} />
-              )}
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.aboutButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowAbout(true);
+                }}
+                activeOpacity={0.7}
+                testID="about-button"
+              >
+                <Info size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.globalToggle,
+                  { backgroundColor: settings.globalEnabled ? Colors.accentDim : Colors.dangerDim },
+                ]}
+                onPress={handleToggleGlobal}
+                activeOpacity={0.7}
+                testID="global-toggle"
+              >
+                {settings.globalEnabled ? (
+                  <Bell size={18} color={Colors.accent} />
+                ) : (
+                  <BellOff size={18} color={Colors.danger} />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.locationRow}>
@@ -800,5 +912,36 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700' as const,
     color: '#0B1A1F',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aboutButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(74,102,112,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(74,102,112,0.3)',
+  },
+  aboutMessage: {
+    fontSize: 17,
+    color: Colors.accentLight,
+    textAlign: 'center',
+    lineHeight: 30,
+    fontWeight: '500' as const,
+    marginBottom: 4,
+  },
+  aboutDua: {
+    fontSize: 16,
+    color: Colors.accent,
+    textAlign: 'center',
+    lineHeight: 28,
+    fontWeight: '600' as const,
+    marginBottom: 16,
   },
 });
