@@ -190,16 +190,11 @@ export function calculatePrayerTimes(
 export function getNextPrayer(prayers: PrayerTime[], nowOverride?: Date): PrayerTime | null {
   const now = nowOverride ?? new Date();
   const nowMs = now.getTime();
-  console.log('[PrayerTimes] getNextPrayer called at', now.toLocaleTimeString());
   for (const prayer of prayers) {
-    const prayerMs = prayer.time.getTime();
-    console.log(`[PrayerTimes]   ${prayer.name}: ${prayer.time.toLocaleTimeString()} (${prayerMs > nowMs ? 'FUTURE' : 'PAST'})`);
-    if (prayerMs > nowMs) {
-      console.log(`[PrayerTimes]   -> Next prayer: ${prayer.name}`);
+    if (prayer.time.getTime() > nowMs) {
       return prayer;
     }
   }
-  console.log('[PrayerTimes]   -> No next prayer found for today');
   return null;
 }
 
