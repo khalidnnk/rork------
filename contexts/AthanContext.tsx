@@ -22,7 +22,7 @@ import {
 
 
 const STORAGE_KEY = 'athan_settings_v3';
-const ATHAN_MAX_DURATION = 50;
+const ATHAN_MAX_DURATION = 300;
 
 const athanAsset = require('@/assets/audio/athan.m4a');
 
