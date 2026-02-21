@@ -96,10 +96,18 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const playerStatus = useAudioPlayerStatus(player);
 
   useEffect(() => {
+    console.log('[AthanContext] Setting audio mode...');
     setAudioModeAsync({
       playsInSilentMode: true,
+      shouldPlayInBackground: true,
+    }).then(() => {
+      console.log('[AthanContext] Audio mode set successfully');
     }).catch((e) => console.log('[AthanContext] setAudioModeAsync error:', e));
   }, []);
+
+  useEffect(() => {
+    console.log('[AthanContext] Player state - isLoaded:', player.isLoaded, 'duration:', player.duration);
+  }, [player.isLoaded, player.duration]);
 
 
 
@@ -115,11 +123,31 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [playerStatus.didJustFinish]);
 
   const playAthan = useCallback(async () => {
-    console.log('[AthanContext] Playing athan, duration:', player.duration, 'playing:', player.playing);
+    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration, 'playing:', player.playing);
     try {
-      player.seekTo(0);
+      if (!player.isLoaded) {
+        console.log('[AthanContext] Player not loaded yet, waiting...');
+        await new Promise<void>((resolve) => {
+          const checkLoaded = setInterval(() => {
+            console.log('[AthanContext] Checking if loaded:', player.isLoaded);
+            if (player.isLoaded) {
+              clearInterval(checkLoaded);
+              resolve();
+            }
+          }, 200);
+          setTimeout(() => {
+            clearInterval(checkLoaded);
+            resolve();
+          }, 5000);
+        });
+      }
+
+      console.log('[AthanContext] Seeking to 0...');
+      await player.seekTo(0);
+      console.log('[AthanContext] Calling play...');
       player.play();
       setIsAdhanPlaying(true);
+      console.log('[AthanContext] Play called, playing:', player.playing);
 
       if (stopTimerRef.current) {
         clearTimeout(stopTimerRef.current);
