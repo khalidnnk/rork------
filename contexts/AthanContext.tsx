@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
-import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync, AudioPlayer } from 'expo-audio';
+import { Asset } from 'expo-asset';
 import {
   PrayerName,
   PrayerTime,
@@ -23,7 +24,7 @@ import {
 const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 300;
 
-const athanAsset = require('@/assets/audio/athan.m4a');
+const athanModule = require('@/assets/audio/athan.m4a');
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -92,13 +93,34 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const player = useAudioPlayer(athanAsset, { downloadFirst: true });
+  const [audioSource, setAudioSource] = useState<{ uri: string } | number>(athanModule);
+
+  const player = useAudioPlayer(audioSource);
   const playerStatus = useAudioPlayerStatus(player);
 
   useEffect(() => {
     setAudioModeAsync({
       playsInSilentMode: true,
     }).catch((e) => console.log('[AthanContext] setAudioModeAsync error:', e));
+  }, []);
+
+  useEffect(() => {
+    async function resolveAudio() {
+      try {
+        const asset = Asset.fromModule(athanModule);
+        await asset.downloadAsync();
+        if (asset.localUri) {
+          console.log('[AthanContext] Audio asset resolved, localUri:', asset.localUri);
+          setAudioSource({ uri: asset.localUri });
+        } else if (asset.uri) {
+          console.log('[AthanContext] Audio asset resolved, uri:', asset.uri);
+          setAudioSource({ uri: asset.uri });
+        }
+      } catch (e) {
+        console.error('[AthanContext] Error resolving audio asset:', e);
+      }
+    }
+    resolveAudio();
   }, []);
 
   useEffect(() => {
@@ -113,7 +135,11 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [playerStatus.didJustFinish]);
 
   const playAthan = useCallback(async () => {
-    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration);
+    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration, 'playing:', player.playing);
+    if (!player.isLoaded) {
+      console.warn('[AthanContext] Audio not loaded yet, cannot play');
+      return;
+    }
     try {
       await player.seekTo(0);
       player.play();

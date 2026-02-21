@@ -109,10 +109,15 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
     outputRange: ['0deg', '360deg'],
   });
 
-  const progress = playerStatus.duration > 0 ? playerStatus.currentTime / playerStatus.duration : 0;
-  const elapsed = Math.floor(playerStatus.currentTime);
-  const total = Math.floor(playerStatus.duration);
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  const safeCurrent = isFinite(playerStatus.currentTime) ? playerStatus.currentTime : 0;
+  const safeDuration = isFinite(playerStatus.duration) ? playerStatus.duration : 0;
+  const progress = safeDuration > 0 ? safeCurrent / safeDuration : 0;
+  const elapsed = Math.floor(safeCurrent);
+  const total = Math.floor(safeDuration);
+  const formatTime = (s: number) => {
+    if (!isFinite(s) || s < 0) return '0:00';
+    return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  };
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
