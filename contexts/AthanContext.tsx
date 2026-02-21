@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { Asset } from 'expo-asset';
 import {
   PrayerName,
   PrayerTime,
@@ -24,9 +25,8 @@ import {
 const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 300;
 
-const athanModuleNative = require('@/assets/audio/athan.mp3');
+const athanModule = require('@/assets/audio/athan.mp3');
 const ATHAN_WEB_URL = 'https://r2-pub.rork.com/attachments/i1kbtyujmwc57cfnj3z5w';
-const athanSource = Platform.OS === 'web' ? { uri: ATHAN_WEB_URL } : athanModuleNative;
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -95,14 +95,47 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const player = useAudioPlayer(athanSource, { downloadFirst: true });
+  const [resolvedSource, setResolvedSource] = useState<{ uri: string } | number | null>(null);
+  const sourceResolved = useRef<boolean>(false);
+
+  useEffect(() => {
+    async function resolveAudioSource() {
+      if (sourceResolved.current) return;
+      sourceResolved.current = true;
+
+      if (Platform.OS === 'web') {
+        console.log('[AthanContext] Web platform - using remote URL');
+        setResolvedSource({ uri: ATHAN_WEB_URL });
+        return;
+      }
+
+      try {
+        console.log('[AthanContext] Resolving local audio asset...');
+        const asset = Asset.fromModule(athanModule);
+        await asset.downloadAsync();
+        console.log('[AthanContext] Asset resolved, localUri:', asset.localUri, 'uri:', asset.uri);
+        const uri = asset.localUri || asset.uri;
+        if (uri) {
+          setResolvedSource({ uri });
+          console.log('[AthanContext] Audio source set to:', uri);
+        } else {
+          console.error('[AthanContext] Could not resolve asset URI, falling back to remote');
+          setResolvedSource({ uri: ATHAN_WEB_URL });
+        }
+      } catch (e) {
+        console.error('[AthanContext] Error resolving audio asset:', e, '- falling back to remote URL');
+        setResolvedSource({ uri: ATHAN_WEB_URL });
+      }
+    }
+
+    resolveAudioSource();
+  }, []);
+
+  const player = useAudioPlayer(resolvedSource);
   const playerStatus = useAudioPlayerStatus(player);
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      console.log('[AthanContext] Web platform - using expo-audio with URI source');
-      return;
-    }
+    if (Platform.OS === 'web') return;
     console.log('[AthanContext] Setting audio mode...');
     setAudioModeAsync({
       playsInSilentMode: true,
@@ -136,12 +169,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
   }, [playerStatus.didJustFinish]);
 
-  const waitForLoaded = useCallback(async (maxWaitMs: number = 5000): Promise<boolean> => {
+  const waitForLoaded = useCallback(async (maxWaitMs: number = 8000): Promise<boolean> => {
     if (player.isLoaded) return true;
     console.log('[AthanContext] Waiting for player to load...');
     const start = Date.now();
     while (Date.now() - start < maxWaitMs) {
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 300));
       if (player.isLoaded) {
         console.log('[AthanContext] Player loaded after', Date.now() - start, 'ms');
         return true;
@@ -152,21 +185,40 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [player]);
 
   const playAthan = useCallback(async () => {
-    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration);
+    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration, 'resolvedSource:', resolvedSource);
     try {
       setIsAdhanPlaying(true);
 
       player.volume = 1.0;
       player.muted = false;
 
-      if (!player.isLoaded) {
-        console.log('[AthanContext] Player not loaded, trying replace to reload source...');
-        player.replace(athanSource);
-        const loaded = await waitForLoaded(8000);
-        if (!loaded) {
-          console.error('[AthanContext] Could not load audio source, aborting play');
+      if (!resolvedSource) {
+        console.log('[AthanContext] Source not resolved yet, waiting...');
+        await new Promise(r => setTimeout(r, 2000));
+        if (!resolvedSource) {
+          console.error('[AthanContext] Audio source still not resolved, aborting');
           setIsAdhanPlaying(false);
           return;
+        }
+      }
+
+      if (!player.isLoaded) {
+        console.log('[AthanContext] Player not loaded, replacing source...');
+        if (resolvedSource) {
+          player.replace(resolvedSource);
+        } else {
+          player.replace({ uri: ATHAN_WEB_URL });
+        }
+        const loaded = await waitForLoaded(10000);
+        if (!loaded) {
+          console.warn('[AthanContext] Player still not loaded, trying remote URL fallback...');
+          player.replace({ uri: ATHAN_WEB_URL });
+          const loadedFallback = await waitForLoaded(10000);
+          if (!loadedFallback) {
+            console.error('[AthanContext] Could not load audio from any source, aborting');
+            setIsAdhanPlaying(false);
+            return;
+          }
         }
       }
 
@@ -195,11 +247,15 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.error('[AthanContext] Error playing athan:', e);
       setIsAdhanPlaying(false);
     }
-  }, [player, waitForLoaded]);
+  }, [player, waitForLoaded, resolvedSource]);
 
   const stopAthan = useCallback(() => {
     console.log('[AthanContext] Stopping athan');
-    player.pause();
+    try {
+      player.pause();
+    } catch (e) {
+      console.log('[AthanContext] Error pausing player:', e);
+    }
     setIsAdhanPlaying(false);
     if (stopTimerRef.current) {
       clearTimeout(stopTimerRef.current);
