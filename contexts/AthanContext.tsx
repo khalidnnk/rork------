@@ -25,6 +25,10 @@ const ATHAN_MAX_DURATION = 300;
 
 const athanModule = require('@/assets/audio/athan.mp3');
 
+const ATHAN_WEB_URL = Platform.OS === 'web'
+  ? (typeof athanModule === 'number' ? undefined : (athanModule?.uri || athanModule?.default || athanModule))
+  : undefined;
+
 export interface AthanSettings {
   globalEnabled: boolean;
   enabledPrayers: Record<PrayerName, boolean>;
@@ -94,8 +98,13 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
   const player = useAudioPlayer(athanModule);
   const playerStatus = useAudioPlayerStatus(player);
+  const webAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      console.log('[AthanContext] Web platform - skipping native audio mode, URL:', ATHAN_WEB_URL);
+      return;
+    }
     console.log('[AthanContext] Setting audio mode...');
     setAudioModeAsync({
       playsInSilentMode: true,
@@ -120,7 +129,85 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
   }, [playerStatus.didJustFinish]);
 
+  const playAthanWeb = useCallback(() => {
+    console.log('[AthanContext] Playing athan via web Audio API');
+    try {
+      if (webAudioRef.current) {
+        webAudioRef.current.pause();
+        webAudioRef.current.removeAttribute('src');
+        webAudioRef.current = null;
+      }
+
+      let audioSrc = ATHAN_WEB_URL;
+      if (!audioSrc) {
+        const resolved = typeof athanModule === 'number' ? undefined : athanModule;
+        if (resolved && typeof resolved === 'object' && resolved.uri) {
+          audioSrc = resolved.uri;
+        } else if (typeof resolved === 'string') {
+          audioSrc = resolved;
+        }
+      }
+
+      if (!audioSrc) {
+        console.error('[AthanContext] No valid audio source for web');
+        setIsAdhanPlaying(false);
+        return;
+      }
+
+      console.log('[AthanContext] Web audio source:', audioSrc);
+      const audio = new Audio(audioSrc);
+      audio.volume = 1.0;
+      webAudioRef.current = audio;
+
+      audio.onended = () => {
+        console.log('[AthanContext] Web audio ended');
+        setIsAdhanPlaying(false);
+        webAudioRef.current = null;
+        if (stopTimerRef.current) {
+          clearTimeout(stopTimerRef.current);
+          stopTimerRef.current = null;
+        }
+      };
+
+      audio.onerror = (err) => {
+        console.error('[AthanContext] Web audio error:', err);
+        setIsAdhanPlaying(false);
+        webAudioRef.current = null;
+      };
+
+      setIsAdhanPlaying(true);
+      audio.play().then(() => {
+        console.log('[AthanContext] Web audio playing successfully');
+      }).catch((err) => {
+        console.error('[AthanContext] Web audio play failed:', err);
+        setIsAdhanPlaying(false);
+        webAudioRef.current = null;
+      });
+
+      if (stopTimerRef.current) {
+        clearTimeout(stopTimerRef.current);
+      }
+      stopTimerRef.current = setTimeout(() => {
+        console.log('[AthanContext] Auto-stopping web athan');
+        if (webAudioRef.current) {
+          webAudioRef.current.pause();
+          webAudioRef.current = null;
+        }
+        setIsAdhanPlaying(false);
+        stopTimerRef.current = null;
+      }, ATHAN_MAX_DURATION * 1000);
+    } catch (e) {
+      console.error('[AthanContext] Web playAthan error:', e);
+      setIsAdhanPlaying(false);
+    }
+  }, []);
+
   const playAthan = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      playAthanWeb();
+      return;
+    }
+
     console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration);
     try {
       setIsAdhanPlaying(true);
@@ -153,11 +240,18 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.error('[AthanContext] Error playing athan:', e);
       setIsAdhanPlaying(false);
     }
-  }, [player]);
+  }, [player, playAthanWeb]);
 
   const stopAthan = useCallback(() => {
     console.log('[AthanContext] Stopping athan');
-    player.pause();
+    if (Platform.OS === 'web') {
+      if (webAudioRef.current) {
+        webAudioRef.current.pause();
+        webAudioRef.current = null;
+      }
+    } else {
+      player.pause();
+    }
     setIsAdhanPlaying(false);
     if (stopTimerRef.current) {
       clearTimeout(stopTimerRef.current);
