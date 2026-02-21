@@ -25,6 +25,7 @@ const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 300;
 
 const athanModule = require('@/assets/audio/athan.mp3');
+const ATHAN_WEB_URL = 'https://r2-pub.rork.com/attachments/i1kbtyujmwc57cfnj3z5w';
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -100,23 +101,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
   useEffect(() => {
     if (Platform.OS === 'web') {
-      console.log('[AthanContext] Web platform - resolving audio asset...');
-      (async () => {
-        try {
-          const [asset] = await Asset.loadAsync(athanModule);
-          if (asset?.uri) {
-            webAudioUriRef.current = asset.uri;
-            console.log('[AthanContext] Web audio asset resolved:', asset.uri);
-          } else if (asset?.localUri) {
-            webAudioUriRef.current = asset.localUri;
-            console.log('[AthanContext] Web audio asset localUri:', asset.localUri);
-          } else {
-            console.error('[AthanContext] Could not resolve web audio asset');
-          }
-        } catch (e) {
-          console.error('[AthanContext] Error resolving web audio asset:', e);
-        }
-      })();
+      console.log('[AthanContext] Web platform - using direct audio URL');
+      webAudioUriRef.current = ATHAN_WEB_URL;
       return;
     }
     console.log('[AthanContext] Setting audio mode...');
@@ -152,30 +138,20 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         webAudioRef.current = null;
       }
 
-      let audioSrc = webAudioUriRef.current;
-
-      if (!audioSrc) {
-        console.log('[AthanContext] Web audio URI not cached, resolving now...');
-        try {
-          const [asset] = await Asset.loadAsync(athanModule);
-          audioSrc = asset?.uri || asset?.localUri || null;
-          if (audioSrc) {
-            webAudioUriRef.current = audioSrc;
-          }
-        } catch (e) {
-          console.error('[AthanContext] Failed to resolve audio asset:', e);
-        }
-      }
-
-      if (!audioSrc) {
-        console.error('[AthanContext] No valid audio source for web');
-        setIsAdhanPlaying(false);
-        return;
-      }
-
+      const audioSrc = webAudioUriRef.current || ATHAN_WEB_URL;
       console.log('[AthanContext] Web audio source:', audioSrc);
-      const audio = new Audio(audioSrc);
+
+      const audio = document.createElement('audio') as HTMLAudioElement;
+      audio.crossOrigin = 'anonymous';
+      audio.preload = 'auto';
       audio.volume = 1.0;
+
+      const source = document.createElement('source');
+      source.src = audioSrc;
+      source.type = 'audio/mpeg';
+      audio.appendChild(source);
+
+      audio.src = audioSrc;
       webAudioRef.current = audio;
 
       audio.onended = () => {
@@ -194,14 +170,44 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         webAudioRef.current = null;
       };
 
-      setIsAdhanPlaying(true);
-      audio.play().then(() => {
-        console.log('[AthanContext] Web audio playing successfully');
-      }).catch((err) => {
-        console.error('[AthanContext] Web audio play failed:', err);
-        setIsAdhanPlaying(false);
-        webAudioRef.current = null;
-      });
+      const tryPlay = () => {
+        setIsAdhanPlaying(true);
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log('[AthanContext] Web audio playing successfully');
+          }).catch((err) => {
+            console.error('[AthanContext] Web audio play failed:', err);
+            console.log('[AthanContext] Retrying with load() first...');
+            audio.load();
+            setTimeout(() => {
+              audio.play().then(() => {
+                console.log('[AthanContext] Web audio retry succeeded');
+              }).catch((retryErr) => {
+                console.error('[AthanContext] Web audio retry also failed:', retryErr);
+                setIsAdhanPlaying(false);
+                webAudioRef.current = null;
+              });
+            }, 300);
+          });
+        }
+      };
+
+      if (audio.readyState >= 2) {
+        tryPlay();
+      } else {
+        audio.addEventListener('canplay', () => {
+          console.log('[AthanContext] Audio canplay event fired');
+          tryPlay();
+        }, { once: true });
+        audio.load();
+        setTimeout(() => {
+          if (!isAdhanPlaying) {
+            console.log('[AthanContext] Forcing play after timeout');
+            tryPlay();
+          }
+        }, 2000);
+      }
 
       if (stopTimerRef.current) {
         clearTimeout(stopTimerRef.current);
