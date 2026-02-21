@@ -95,7 +95,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const player = useAudioPlayer(athanSource);
+  const player = useAudioPlayer(athanSource, { downloadFirst: true });
   const playerStatus = useAudioPlayerStatus(player);
 
   useEffect(() => {
@@ -117,6 +117,15 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [playerStatus.playing, playerStatus.isLoaded, playerStatus.playbackState, playerStatus.duration]);
 
   useEffect(() => {
+    const sub = player.addListener('playbackStatusUpdate', (status: any) => {
+      if (status?.error) {
+        console.error('[AthanContext] Player error event:', status.error);
+      }
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  useEffect(() => {
     if (playerStatus.didJustFinish) {
       console.log('[AthanContext] Athan playback finished');
       setIsAdhanPlaying(false);
@@ -127,6 +136,21 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
   }, [playerStatus.didJustFinish]);
 
+  const waitForLoaded = useCallback(async (maxWaitMs: number = 5000): Promise<boolean> => {
+    if (player.isLoaded) return true;
+    console.log('[AthanContext] Waiting for player to load...');
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise(r => setTimeout(r, 200));
+      if (player.isLoaded) {
+        console.log('[AthanContext] Player loaded after', Date.now() - start, 'ms');
+        return true;
+      }
+    }
+    console.warn('[AthanContext] Player did not load within', maxWaitMs, 'ms');
+    return false;
+  }, [player]);
+
   const playAthan = useCallback(async () => {
     console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration);
     try {
@@ -134,6 +158,17 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
       player.volume = 1.0;
       player.muted = false;
+
+      if (!player.isLoaded) {
+        console.log('[AthanContext] Player not loaded, trying replace to reload source...');
+        player.replace(athanSource);
+        const loaded = await waitForLoaded(8000);
+        if (!loaded) {
+          console.error('[AthanContext] Could not load audio source, aborting play');
+          setIsAdhanPlaying(false);
+          return;
+        }
+      }
 
       try {
         console.log('[AthanContext] Seeking to 0...');
@@ -160,7 +195,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.error('[AthanContext] Error playing athan:', e);
       setIsAdhanPlaying(false);
     }
-  }, [player]);
+  }, [player, waitForLoaded]);
 
   const stopAthan = useCallback(() => {
     console.log('[AthanContext] Stopping athan');
