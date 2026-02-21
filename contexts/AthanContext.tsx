@@ -94,7 +94,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
   const player = useAudioPlayer(athanModule);
   const playerStatus = useAudioPlayerStatus(player);
-  const playerLoadedRef = useRef<boolean>(false);
 
   useEffect(() => {
     console.log('[AthanContext] Setting audio mode...');
@@ -107,15 +106,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, []);
 
   useEffect(() => {
-    playerLoadedRef.current = playerStatus.isLoaded;
-    console.log('[AthanContext] Player status isLoaded:', playerStatus.isLoaded, 'duration:', playerStatus.duration);
-  }, [playerStatus.isLoaded, playerStatus.duration]);
-
-  useEffect(() => {
-    console.log('[AthanContext] PlayerStatus update - playing:', playerStatus.playing, 'isLoaded:', playerStatus.isLoaded, 'isBuffering:', playerStatus.isBuffering, 'currentTime:', playerStatus.currentTime, 'duration:', playerStatus.duration, 'playbackState:', playerStatus.playbackState);
-  }, [playerStatus.playing, playerStatus.isLoaded, playerStatus.isBuffering, playerStatus.playbackState]);
-
-
+    console.log('[AthanContext] PlayerStatus update - playing:', playerStatus.playing, 'isLoaded:', playerStatus.isLoaded, 'duration:', playerStatus.duration, 'playbackState:', playerStatus.playbackState);
+  }, [playerStatus.playing, playerStatus.isLoaded, playerStatus.playbackState, playerStatus.duration]);
 
   useEffect(() => {
     if (playerStatus.didJustFinish) {
@@ -129,56 +121,24 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [playerStatus.didJustFinish]);
 
   const playAthan = useCallback(async () => {
-    console.log('[AthanContext] Playing athan, playerLoadedRef:', playerLoadedRef.current);
+    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration);
     try {
       setIsAdhanPlaying(true);
-
-      if (!playerLoadedRef.current) {
-        console.log('[AthanContext] Player not loaded yet, waiting via listener...');
-        await new Promise<void>((resolve) => {
-          const timeout = setTimeout(() => {
-            console.log('[AthanContext] Timed out waiting for player to load');
-            resolve();
-          }, 8000);
-
-          const subscription = player.addListener('playbackStatusUpdate', (status: { isLoaded?: boolean }) => {
-            console.log('[AthanContext] Status update while waiting:', status?.isLoaded);
-            if (status?.isLoaded) {
-              clearTimeout(timeout);
-              subscription.remove();
-              playerLoadedRef.current = true;
-              resolve();
-            }
-          });
-
-          if (playerLoadedRef.current) {
-            clearTimeout(timeout);
-            subscription.remove();
-            resolve();
-          }
-        });
-      }
-
-      if (!playerLoadedRef.current) {
-        console.error('[AthanContext] Player still not loaded after waiting, trying to play anyway...');
-      }
 
       player.volume = 1.0;
       player.muted = false;
 
-      console.log('[AthanContext] Seeking to 0...');
-      await player.seekTo(0);
-      console.log('[AthanContext] Seek done, now calling play...');
-      player.play();
-      console.log('[AthanContext] Play called');
+      try {
+        console.log('[AthanContext] Seeking to 0...');
+        await player.seekTo(0);
+        console.log('[AthanContext] Seek done');
+      } catch (seekErr) {
+        console.log('[AthanContext] Seek error (ignoring):', seekErr);
+      }
 
-      setTimeout(() => {
-        console.log('[AthanContext] Post-play check (500ms): playing:', player.playing, 'currentTime:', player.currentTime);
-        if (!player.playing) {
-          console.log('[AthanContext] Player not playing after 500ms, retrying play...');
-          player.play();
-        }
-      }, 500);
+      console.log('[AthanContext] Calling play...');
+      player.play();
+      console.log('[AthanContext] Play called, playing:', player.playing);
 
       if (stopTimerRef.current) {
         clearTimeout(stopTimerRef.current);
