@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
-import { Asset } from 'expo-asset';
 import {
   PrayerName,
   PrayerTime,
@@ -24,8 +24,9 @@ import {
 const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 300;
 
-const athanModule = require('@/assets/audio/athan.mp3');
+const athanModuleNative = require('@/assets/audio/athan.mp3');
 const ATHAN_WEB_URL = 'https://r2-pub.rork.com/attachments/i1kbtyujmwc57cfnj3z5w';
+const athanSource = Platform.OS === 'web' ? { uri: ATHAN_WEB_URL } : athanModuleNative;
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -94,15 +95,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const player = useAudioPlayer(athanModule);
+  const player = useAudioPlayer(athanSource);
   const playerStatus = useAudioPlayerStatus(player);
-  const webAudioRef = useRef<HTMLAudioElement | null>(null);
-  const webAudioUriRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
-      console.log('[AthanContext] Web platform - using direct audio URL');
-      webAudioUriRef.current = ATHAN_WEB_URL;
+      console.log('[AthanContext] Web platform - using expo-audio with URI source');
       return;
     }
     console.log('[AthanContext] Setting audio mode...');
@@ -129,110 +127,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
   }, [playerStatus.didJustFinish]);
 
-  const playAthanWeb = useCallback(async () => {
-    console.log('[AthanContext] Playing athan via web Audio API');
-    try {
-      if (webAudioRef.current) {
-        webAudioRef.current.pause();
-        webAudioRef.current.removeAttribute('src');
-        webAudioRef.current = null;
-      }
-
-      const audioSrc = webAudioUriRef.current || ATHAN_WEB_URL;
-      console.log('[AthanContext] Web audio source:', audioSrc);
-
-      const audio = document.createElement('audio') as HTMLAudioElement;
-      audio.crossOrigin = 'anonymous';
-      audio.preload = 'auto';
-      audio.volume = 1.0;
-
-      const source = document.createElement('source');
-      source.src = audioSrc;
-      source.type = 'audio/mpeg';
-      audio.appendChild(source);
-
-      audio.src = audioSrc;
-      webAudioRef.current = audio;
-
-      audio.onended = () => {
-        console.log('[AthanContext] Web audio ended');
-        setIsAdhanPlaying(false);
-        webAudioRef.current = null;
-        if (stopTimerRef.current) {
-          clearTimeout(stopTimerRef.current);
-          stopTimerRef.current = null;
-        }
-      };
-
-      audio.onerror = (err) => {
-        console.error('[AthanContext] Web audio error:', err);
-        setIsAdhanPlaying(false);
-        webAudioRef.current = null;
-      };
-
-      const tryPlay = () => {
-        setIsAdhanPlaying(true);
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            console.log('[AthanContext] Web audio playing successfully');
-          }).catch((err) => {
-            console.error('[AthanContext] Web audio play failed:', err);
-            console.log('[AthanContext] Retrying with load() first...');
-            audio.load();
-            setTimeout(() => {
-              audio.play().then(() => {
-                console.log('[AthanContext] Web audio retry succeeded');
-              }).catch((retryErr) => {
-                console.error('[AthanContext] Web audio retry also failed:', retryErr);
-                setIsAdhanPlaying(false);
-                webAudioRef.current = null;
-              });
-            }, 300);
-          });
-        }
-      };
-
-      if (audio.readyState >= 2) {
-        tryPlay();
-      } else {
-        audio.addEventListener('canplay', () => {
-          console.log('[AthanContext] Audio canplay event fired');
-          tryPlay();
-        }, { once: true });
-        audio.load();
-        setTimeout(() => {
-          if (!isAdhanPlaying) {
-            console.log('[AthanContext] Forcing play after timeout');
-            tryPlay();
-          }
-        }, 2000);
-      }
-
-      if (stopTimerRef.current) {
-        clearTimeout(stopTimerRef.current);
-      }
-      stopTimerRef.current = setTimeout(() => {
-        console.log('[AthanContext] Auto-stopping web athan');
-        if (webAudioRef.current) {
-          webAudioRef.current.pause();
-          webAudioRef.current = null;
-        }
-        setIsAdhanPlaying(false);
-        stopTimerRef.current = null;
-      }, ATHAN_MAX_DURATION * 1000);
-    } catch (e) {
-      console.error('[AthanContext] Web playAthan error:', e);
-      setIsAdhanPlaying(false);
-    }
-  }, []);
-
   const playAthan = useCallback(async () => {
-    if (Platform.OS === 'web') {
-      await playAthanWeb();
-      return;
-    }
-
     console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration);
     try {
       setIsAdhanPlaying(true);
@@ -265,24 +160,35 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.error('[AthanContext] Error playing athan:', e);
       setIsAdhanPlaying(false);
     }
-  }, [player, playAthanWeb]);
+  }, [player]);
 
   const stopAthan = useCallback(() => {
     console.log('[AthanContext] Stopping athan');
-    if (Platform.OS === 'web') {
-      if (webAudioRef.current) {
-        webAudioRef.current.pause();
-        webAudioRef.current = null;
-      }
-    } else {
-      player.pause();
-    }
+    player.pause();
     setIsAdhanPlaying(false);
     if (stopTimerRef.current) {
       clearTimeout(stopTimerRef.current);
       stopTimerRef.current = null;
     }
   }, [player]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (data?.prayerName) {
+        console.log('[AthanContext] Prayer notification received for:', data.prayerName);
+        const prayerName = data.prayerName as PrayerName;
+        if (settings.globalEnabled && settings.enabledPrayers[prayerName]) {
+          console.log('[AthanContext] Auto-playing athan for notification:', prayerName);
+          playAthan();
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [settings.globalEnabled, settings.enabledPrayers, playAthan]);
 
   const settingsQuery = useQuery({
     queryKey: ['athan-settings'],

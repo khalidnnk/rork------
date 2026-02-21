@@ -5,7 +5,7 @@ import { PrayerTime, PrayerName } from './prayerTimes';
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
-    shouldPlaySound: true,
+    shouldPlaySound: false,
     shouldSetBadge: false,
     shouldShowBanner: true,
     shouldShowList: true,
@@ -44,7 +44,6 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       name: 'Athan Alerts',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      sound: 'athan.m4r',
     });
   }
 
@@ -71,7 +70,7 @@ export async function scheduleAthanNotification(
       content: {
         title: `حان وقت صلاة ${prayer.labelAr}`,
         body: `${prayer.label} - ${prayer.timeStr}`,
-        sound: 'athan.m4r',
+        sound: false,
         priority: Notifications.AndroidNotificationPriority.MAX,
         ...(Platform.OS === 'android' ? { channelId: 'athan' } : {}),
         data: { prayerName: prayer.name, time: prayer.timeStr },
