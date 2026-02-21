@@ -106,8 +106,15 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, []);
 
   useEffect(() => {
-    console.log('[AthanContext] Player state - isLoaded:', player.isLoaded, 'duration:', player.duration);
+    console.log('[AthanContext] Player state - isLoaded:', player.isLoaded, 'duration:', player.duration, 'volume:', player.volume, 'muted:', player.muted);
+    if (player.isLoaded) {
+      console.log('[AthanContext] Player loaded successfully! Duration:', player.duration, 'seconds');
+    }
   }, [player.isLoaded, player.duration]);
+
+  useEffect(() => {
+    console.log('[AthanContext] PlayerStatus update - playing:', playerStatus.playing, 'isLoaded:', playerStatus.isLoaded, 'isBuffering:', playerStatus.isBuffering, 'currentTime:', playerStatus.currentTime, 'duration:', playerStatus.duration, 'playbackState:', playerStatus.playbackState);
+  }, [playerStatus.playing, playerStatus.isLoaded, playerStatus.isBuffering, playerStatus.playbackState]);
 
 
 
@@ -123,31 +130,47 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [playerStatus.didJustFinish]);
 
   const playAthan = useCallback(async () => {
-    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration, 'playing:', player.playing);
+    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration, 'playing:', player.playing, 'paused:', player.paused, 'volume:', player.volume, 'muted:', player.muted);
     try {
       setIsAdhanPlaying(true);
 
       if (!player.isLoaded) {
-        console.log('[AthanContext] Player not loaded yet, waiting briefly...');
+        console.log('[AthanContext] Player not loaded yet, waiting...');
         await new Promise<void>((resolve) => {
+          const startTime = Date.now();
           const checkLoaded = setInterval(() => {
+            console.log('[AthanContext] Checking loaded...', player.isLoaded, 'elapsed:', Date.now() - startTime, 'ms');
             if (player.isLoaded) {
               clearInterval(checkLoaded);
               resolve();
             }
-          }, 100);
+          }, 200);
           setTimeout(() => {
             clearInterval(checkLoaded);
+            console.log('[AthanContext] Timed out waiting for player to load, isLoaded:', player.isLoaded);
             resolve();
-          }, 3000);
+          }, 5000);
         });
       }
 
+      if (!player.isLoaded) {
+        console.error('[AthanContext] Player still not loaded after waiting, cannot play');
+        setIsAdhanPlaying(false);
+        return;
+      }
+
+      player.volume = 1.0;
+      player.muted = false;
+
       console.log('[AthanContext] Seeking to 0...');
-      player.seekTo(0);
-      console.log('[AthanContext] Calling play...');
+      await player.seekTo(0);
+      console.log('[AthanContext] Seek done, now calling play...');
       player.play();
-      console.log('[AthanContext] Play called, playing:', player.playing);
+      console.log('[AthanContext] Play called, playing:', player.playing, 'paused:', player.paused);
+
+      setTimeout(() => {
+        console.log('[AthanContext] Post-play check (500ms): playing:', player.playing, 'paused:', player.paused, 'currentTime:', player.currentTime, 'duration:', player.duration);
+      }, 500);
 
       if (stopTimerRef.current) {
         clearTimeout(stopTimerRef.current);
