@@ -44,10 +44,10 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
   useEffect(() => {
     if (visible) {
       fadeAnim.setValue(0);
-      scaleAnim.setValue(0.8);
+      scaleAnim.setValue(0.9);
       Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, friction: 7, tension: 40, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 8, tension: 80, useNativeDriver: true }),
       ]).start();
 
       const wave1 = Animated.loop(
@@ -97,8 +97,8 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
   const handleStop = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 0.9, duration: 200, useNativeDriver: true }),
     ]).start(() => {
       onStop();
     });

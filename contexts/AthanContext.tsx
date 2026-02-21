@@ -23,7 +23,7 @@ import {
 const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 300;
 
-const athanModule = require('@/assets/audio/athan.m4a');
+const athanModule = require('@/assets/audio/athan.mp3');
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -92,7 +92,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const player = useAudioPlayer(athanModule);
+  const player = useAudioPlayer(athanModule, { downloadFirst: true });
   const playerStatus = useAudioPlayerStatus(player);
 
   useEffect(() => {
@@ -125,28 +125,28 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const playAthan = useCallback(async () => {
     console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration, 'playing:', player.playing);
     try {
+      setIsAdhanPlaying(true);
+
       if (!player.isLoaded) {
-        console.log('[AthanContext] Player not loaded yet, waiting...');
+        console.log('[AthanContext] Player not loaded yet, waiting briefly...');
         await new Promise<void>((resolve) => {
           const checkLoaded = setInterval(() => {
-            console.log('[AthanContext] Checking if loaded:', player.isLoaded);
             if (player.isLoaded) {
               clearInterval(checkLoaded);
               resolve();
             }
-          }, 200);
+          }, 100);
           setTimeout(() => {
             clearInterval(checkLoaded);
             resolve();
-          }, 5000);
+          }, 3000);
         });
       }
 
       console.log('[AthanContext] Seeking to 0...');
-      await player.seekTo(0);
+      player.seekTo(0);
       console.log('[AthanContext] Calling play...');
       player.play();
-      setIsAdhanPlaying(true);
       console.log('[AthanContext] Play called, playing:', player.playing);
 
       if (stopTimerRef.current) {
