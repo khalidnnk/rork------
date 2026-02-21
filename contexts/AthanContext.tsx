@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { Asset } from 'expo-asset';
 import {
   PrayerName,
   PrayerTime,
@@ -24,10 +25,6 @@ const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 300;
 
 const athanModule = require('@/assets/audio/athan.mp3');
-
-const ATHAN_WEB_URL = Platform.OS === 'web'
-  ? (typeof athanModule === 'number' ? undefined : (athanModule?.uri || athanModule?.default || athanModule))
-  : undefined;
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -99,10 +96,27 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const player = useAudioPlayer(athanModule);
   const playerStatus = useAudioPlayerStatus(player);
   const webAudioRef = useRef<HTMLAudioElement | null>(null);
+  const webAudioUriRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
-      console.log('[AthanContext] Web platform - skipping native audio mode, URL:', ATHAN_WEB_URL);
+      console.log('[AthanContext] Web platform - resolving audio asset...');
+      (async () => {
+        try {
+          const [asset] = await Asset.loadAsync(athanModule);
+          if (asset?.uri) {
+            webAudioUriRef.current = asset.uri;
+            console.log('[AthanContext] Web audio asset resolved:', asset.uri);
+          } else if (asset?.localUri) {
+            webAudioUriRef.current = asset.localUri;
+            console.log('[AthanContext] Web audio asset localUri:', asset.localUri);
+          } else {
+            console.error('[AthanContext] Could not resolve web audio asset');
+          }
+        } catch (e) {
+          console.error('[AthanContext] Error resolving web audio asset:', e);
+        }
+      })();
       return;
     }
     console.log('[AthanContext] Setting audio mode...');
@@ -129,7 +143,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
   }, [playerStatus.didJustFinish]);
 
-  const playAthanWeb = useCallback(() => {
+  const playAthanWeb = useCallback(async () => {
     console.log('[AthanContext] Playing athan via web Audio API');
     try {
       if (webAudioRef.current) {
@@ -138,13 +152,18 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         webAudioRef.current = null;
       }
 
-      let audioSrc = ATHAN_WEB_URL;
+      let audioSrc = webAudioUriRef.current;
+
       if (!audioSrc) {
-        const resolved = typeof athanModule === 'number' ? undefined : athanModule;
-        if (resolved && typeof resolved === 'object' && resolved.uri) {
-          audioSrc = resolved.uri;
-        } else if (typeof resolved === 'string') {
-          audioSrc = resolved;
+        console.log('[AthanContext] Web audio URI not cached, resolving now...');
+        try {
+          const [asset] = await Asset.loadAsync(athanModule);
+          audioSrc = asset?.uri || asset?.localUri || null;
+          if (audioSrc) {
+            webAudioUriRef.current = audioSrc;
+          }
+        } catch (e) {
+          console.error('[AthanContext] Failed to resolve audio asset:', e);
         }
       }
 
@@ -204,7 +223,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
   const playAthan = useCallback(async () => {
     if (Platform.OS === 'web') {
-      playAthanWeb();
+      await playAthanWeb();
       return;
     }
 
