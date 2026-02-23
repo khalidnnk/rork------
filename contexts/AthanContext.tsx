@@ -169,12 +169,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
   }, [playerStatus.didJustFinish]);
 
-  const waitForLoaded = useCallback(async (maxWaitMs: number = 8000): Promise<boolean> => {
+  const waitForLoaded = useCallback(async (maxWaitMs: number = 5000): Promise<boolean> => {
     if (player.isLoaded) return true;
     console.log('[AthanContext] Waiting for player to load...');
     const start = Date.now();
     while (Date.now() - start < maxWaitMs) {
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 100));
       if (player.isLoaded) {
         console.log('[AthanContext] Player loaded after', Date.now() - start, 'ms');
         return true;
@@ -185,54 +185,41 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [player]);
 
   const playAthan = useCallback(async () => {
-    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration, 'resolvedSource:', resolvedSource);
+    console.log('[AthanContext] Playing athan, isLoaded:', player.isLoaded, 'duration:', player.duration);
     try {
       setIsAdhanPlaying(true);
-
       player.volume = 1.0;
       player.muted = false;
 
-      if (!resolvedSource) {
-        console.log('[AthanContext] Source not resolved yet, waiting...');
-        await new Promise(r => setTimeout(r, 2000));
-        if (!resolvedSource) {
-          console.error('[AthanContext] Audio source still not resolved, aborting');
+      if (player.isLoaded) {
+        player.seekTo(0);
+        player.play();
+        console.log('[AthanContext] Player was loaded, playing immediately');
+      } else {
+        const source = resolvedSource || { uri: ATHAN_WEB_URL };
+        console.log('[AthanContext] Player not loaded, replacing and playing...');
+        player.replace(source);
+        const loaded = await waitForLoaded(5000);
+        if (loaded) {
+          player.play();
+          console.log('[AthanContext] Player loaded and playing');
+        } else if (resolvedSource && resolvedSource !== source) {
+          console.log('[AthanContext] Trying fallback URL...');
+          player.replace({ uri: ATHAN_WEB_URL });
+          const fallbackLoaded = await waitForLoaded(5000);
+          if (fallbackLoaded) {
+            player.play();
+          } else {
+            console.error('[AthanContext] Could not load audio, aborting');
+            setIsAdhanPlaying(false);
+            return;
+          }
+        } else {
+          console.error('[AthanContext] Could not load audio, aborting');
           setIsAdhanPlaying(false);
           return;
         }
       }
-
-      if (!player.isLoaded) {
-        console.log('[AthanContext] Player not loaded, replacing source...');
-        if (resolvedSource) {
-          player.replace(resolvedSource);
-        } else {
-          player.replace({ uri: ATHAN_WEB_URL });
-        }
-        const loaded = await waitForLoaded(10000);
-        if (!loaded) {
-          console.warn('[AthanContext] Player still not loaded, trying remote URL fallback...');
-          player.replace({ uri: ATHAN_WEB_URL });
-          const loadedFallback = await waitForLoaded(10000);
-          if (!loadedFallback) {
-            console.error('[AthanContext] Could not load audio from any source, aborting');
-            setIsAdhanPlaying(false);
-            return;
-          }
-        }
-      }
-
-      try {
-        console.log('[AthanContext] Seeking to 0...');
-        await player.seekTo(0);
-        console.log('[AthanContext] Seek done');
-      } catch (seekErr) {
-        console.log('[AthanContext] Seek error (ignoring):', seekErr);
-      }
-
-      console.log('[AthanContext] Calling play...');
-      player.play();
-      console.log('[AthanContext] Play called, playing:', player.playing);
 
       if (stopTimerRef.current) {
         clearTimeout(stopTimerRef.current);
