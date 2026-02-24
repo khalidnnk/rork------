@@ -13,8 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import {
   MapPin,
-  Bell,
-  BellOff,
+
   Clock,
   Sun,
   Sunset,
@@ -233,7 +232,7 @@ export default function HomeScreen() {
     dailyPrayers,
     nextPrayer,
     locationLoading,
-    toggleGlobal,
+
     dismissWelcome,
   } = useAthan();
 
@@ -303,11 +302,6 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [nextPrayer]);
 
-  const handleToggleGlobal = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    toggleGlobal();
-  }, [toggleGlobal]);
-
   const handleDismissWelcome = useCallback(() => {
     setShowWelcome(false);
     dismissWelcome();
@@ -353,8 +347,7 @@ export default function HomeScreen() {
                 <Text style={styles.subtitleText}>Alsulaimani Athan</Text>
               </View>
             </View>
-            <View style={styles.headerActions}>
-              <TouchableOpacity
+            <TouchableOpacity
                 style={styles.aboutButton}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -365,22 +358,6 @@ export default function HomeScreen() {
               >
                 <Info size={18} color={Colors.textSecondary} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.globalToggle,
-                  { backgroundColor: settings.globalEnabled ? Colors.accentDim : Colors.dangerDim },
-                ]}
-                onPress={handleToggleGlobal}
-                activeOpacity={0.7}
-                testID="global-toggle"
-              >
-                {settings.globalEnabled ? (
-                  <Bell size={18} color={Colors.accent} />
-                ) : (
-                  <BellOff size={18} color={Colors.danger} />
-                )}
-              </TouchableOpacity>
-            </View>
           </View>
 
           <View style={styles.locationRow}>
@@ -571,15 +548,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginTop: 2,
   },
-  globalToggle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.2)',
-  },
+
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -852,11 +821,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Dubai-Bold',
     color: '#0B1A1F',
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+
   aboutButton: {
     width: 44,
     height: 44,
