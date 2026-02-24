@@ -27,8 +27,14 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
-import { useAthan } from '@/contexts/AthanContext';
+import { useAthan, NotificationSoundType } from '@/contexts/AthanContext';
 import { PrayerName } from '@/utils/prayerTimes';
+
+const SOUND_OPTIONS: { key: NotificationSoundType; label: string; description: string }[] = [
+  { key: 'athan', label: 'حي على الصلاة', description: 'صوت الأذان المخصص' },
+  { key: 'default', label: 'صوت النظام', description: 'نغمة التنبيه الافتراضية' },
+  { key: 'silent', label: 'صامت', description: 'بدون صوت' },
+];
 
 const OFFSET_OPTIONS = [0, 2, 5];
 
@@ -203,6 +209,7 @@ export default function SettingsScreen() {
     playerStatus,
     detectAutoLocation,
     locationLoading,
+    updateSettings,
   } = useAthan();
 
   const handlePlayAthan = useCallback(() => {
@@ -240,6 +247,14 @@ export default function SettingsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     detectAutoLocation();
   }, [detectAutoLocation]);
+
+  const handleSoundChange = useCallback(
+    (sound: NotificationSoundType) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      updateSettings({ notificationSound: sound });
+    },
+    [updateSettings]
+  );
 
   const prayerNames: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 
@@ -322,6 +337,44 @@ export default function SettingsScreen() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>صوت التنبيه</Text>
+          <Text style={styles.sectionDescription}>
+            اختر الصوت الذي يصدر عند وقت الصلاة
+          </Text>
+          <View style={styles.card}>
+            {SOUND_OPTIONS.map((option, index) => {
+              const isActive = settings.notificationSound === option.key;
+              return (
+                <View key={option.key}>
+                  {index > 0 && <View style={styles.divider} />}
+                  <TouchableOpacity
+                    style={styles.soundOptionRow}
+                    onPress={() => handleSoundChange(option.key)}
+                    activeOpacity={0.7}
+                    testID={`sound-${option.key}`}
+                  >
+                    <View style={styles.soundOptionLeft}>
+                      <View style={[styles.radioOuter, isActive && styles.radioOuterActive]}>
+                        {isActive && <View style={styles.radioInner} />}
+                      </View>
+                      <View style={styles.cardRowTextWrap}>
+                        <Text style={[styles.cardRowTitle, isActive && styles.soundOptionActive]}>{option.label}</Text>
+                        <Text style={styles.cardRowSubtitle}>{option.description}</Text>
+                      </View>
+                    </View>
+                    {isActive && (
+                      <View style={styles.activeLabel}>
+                        <Text style={styles.activeLabelText}>مفعّل</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -718,6 +771,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Dubai-Medium',
     color: Colors.teal,
+  },
+  soundOptionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  soundOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  soundOptionActive: {
+    color: Colors.accent,
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Colors.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOuterActive: {
+    borderColor: Colors.accent,
+  },
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.accent,
   },
 });
 

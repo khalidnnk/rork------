@@ -28,6 +28,8 @@ const ATHAN_MAX_DURATION = 300;
 const athanModule = require('@/assets/audio/athan.mp3');
 const ATHAN_WEB_URL = 'https://r2-pub.rork.com/attachments/i1kbtyujmwc57cfnj3z5w';
 
+export type NotificationSoundType = 'athan' | 'default' | 'silent';
+
 export interface AthanSettings {
   globalEnabled: boolean;
   enabledPrayers: Record<PrayerName, boolean>;
@@ -38,6 +40,7 @@ export interface AthanSettings {
   timezone: number;
   locationMode: 'auto' | 'manual';
   hasSeenWelcome: boolean;
+  notificationSound: NotificationSoundType;
 }
 
 const DEFAULT_SETTINGS: AthanSettings = {
@@ -62,6 +65,7 @@ const DEFAULT_SETTINGS: AthanSettings = {
   timezone: 3,
   locationMode: 'auto' as const,
   hasSeenWelcome: false,
+  notificationSound: 'athan' as const,
 };
 
 async function loadSettings(): Promise<AthanSettings> {
@@ -587,12 +591,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     async function scheduleNotifs() {
       const granted = await requestNotificationPermissions();
       if (granted) {
-        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers);
+        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound);
       }
     }
 
     scheduleNotifs();
-  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled]);
+  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled, settings.notificationSound]);
 
   return {
     settings,

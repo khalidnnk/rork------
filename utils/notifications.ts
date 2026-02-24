@@ -1,17 +1,29 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { PrayerTime, PrayerName } from './prayerTimes';
+import { NotificationSoundType } from '@/contexts/AthanContext';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
-    shouldPlaySound: false,
+    shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,
     shouldShowList: true,
     priority: Notifications.AndroidNotificationPriority.MAX,
   }),
 });
+
+function getNotificationSound(soundType: NotificationSoundType): boolean | string {
+  switch (soundType) {
+    case 'athan':
+      return 'haya-ala-salah.m4a';
+    case 'default':
+      return true;
+    case 'silent':
+      return false;
+  }
+}
 
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (Platform.OS === 'web') {
@@ -53,7 +65,8 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 export async function scheduleAthanNotification(
   prayer: PrayerTime,
-  enabled: boolean
+  enabled: boolean,
+  soundType: NotificationSoundType = 'athan'
 ): Promise<string | null> {
   if (Platform.OS === 'web' || !enabled) return null;
 
@@ -64,13 +77,15 @@ export async function scheduleAthanNotification(
   }
 
   const secondsUntil = Math.floor((prayer.time.getTime() - now.getTime()) / 1000);
+  const sound = getNotificationSound(soundType);
+  console.log(`[Notifications] Sound for ${prayer.name}: ${sound} (type: ${soundType})`);
 
   try {
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: `حان وقت صلاة ${prayer.labelAr}`,
         body: `${prayer.label} - ${prayer.timeStr}`,
-        sound: false,
+        sound: sound,
         priority: Notifications.AndroidNotificationPriority.MAX,
         ...(Platform.OS === 'android' ? { channelId: 'athan' } : {}),
         data: { prayerName: prayer.name, time: prayer.timeStr },
@@ -81,7 +96,7 @@ export async function scheduleAthanNotification(
       },
     });
 
-    console.log(`[Notifications] Scheduled ${prayer.name} in ${secondsUntil}s, id: ${id}`);
+    console.log(`[Notifications] Scheduled ${prayer.name} in ${secondsUntil}s, id: ${id}, sound: ${sound}`);
     return id;
   } catch (error) {
     console.error(`[Notifications] Error scheduling ${prayer.name}:`, error);
@@ -91,16 +106,17 @@ export async function scheduleAthanNotification(
 
 export async function scheduleAllNotifications(
   prayers: PrayerTime[],
-  enabledPrayers: Record<PrayerName, boolean>
+  enabledPrayers: Record<PrayerName, boolean>,
+  soundType: NotificationSoundType = 'athan'
 ): Promise<void> {
   if (Platform.OS === 'web') return;
 
   await Notifications.cancelAllScheduledNotificationsAsync();
-  console.log('[Notifications] Cleared all existing notifications');
+  console.log('[Notifications] Cleared all existing notifications, soundType:', soundType);
 
   for (const prayer of prayers) {
     if (enabledPrayers[prayer.name]) {
-      await scheduleAthanNotification(prayer, true);
+      await scheduleAthanNotification(prayer, true, soundType);
     }
   }
 }

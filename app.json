@@ -36,7 +36,15 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/audio/haya-ala-salah.m4a"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
