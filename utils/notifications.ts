@@ -18,6 +18,8 @@ function getNotificationSound(soundType: NotificationSoundType): boolean | strin
   switch (soundType) {
     case 'athan':
       return 'haya-ala-salah.m4a';
+    case 'full_athan':
+      return 'athan.mp3';
     case 'default':
       return true;
     case 'silent':

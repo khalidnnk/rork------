@@ -32,7 +32,8 @@ import { Volume1 } from 'lucide-react-native';
 import { PrayerName } from '@/utils/prayerTimes';
 
 const SOUND_OPTIONS: { key: NotificationSoundType; label: string; description: string }[] = [
-  { key: 'athan', label: 'حي على الصلاة', description: 'صوت الأذان المخصص' },
+  { key: 'athan', label: 'حي على الصلاة', description: 'مقطع قصير من الأذان' },
+  { key: 'full_athan', label: 'الأذان كاملاً', description: 'صوت الأذان الكامل' },
   { key: 'default', label: 'صوت النظام', description: 'نغمة التنبيه الافتراضية' },
   { key: 'silent', label: 'صامت', description: 'بدون صوت' },
 ];
@@ -383,13 +384,13 @@ export default function SettingsScreen() {
                         <TouchableOpacity
                           style={[
                             styles.previewButton,
-                            isPreviewPlaying && isActive && styles.previewButtonActive,
+                            isPreviewPlaying && settings.notificationSound === option.key && styles.previewButtonActive,
                           ]}
                           onPress={() => handlePreviewSound(option.key)}
                           activeOpacity={0.6}
                           testID={`preview-${option.key}`}
                         >
-                          {isPreviewPlaying && isActive ? (
+                          {isPreviewPlaying && settings.notificationSound === option.key ? (
                             <Square size={13} color={Colors.accent} fill={Colors.accent} />
                           ) : (
                             <Volume1 size={16} color={isActive ? Colors.accent : Colors.textSecondary} />
