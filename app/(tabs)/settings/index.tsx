@@ -32,8 +32,8 @@ import { Volume1 } from 'lucide-react-native';
 import { PrayerName } from '@/utils/prayerTimes';
 
 const SOUND_OPTIONS: { key: NotificationSoundType; label: string; description: string }[] = [
-  { key: 'athan', label: 'حي على الصلاة', description: 'مقطع قصير من الأذان' },
   { key: 'full_athan', label: 'الأذان كاملاً', description: 'صوت الأذان الكامل' },
+  { key: 'athan', label: 'حي على الصلاة', description: 'مقطع قصير من الأذان' },
   { key: 'default', label: 'صوت النظام', description: 'نغمة التنبيه الافتراضية' },
   { key: 'silent', label: 'صامت', description: 'بدون صوت' },
 ];
