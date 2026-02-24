@@ -96,6 +96,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const [settings, setSettings] = useState<AthanSettings>(DEFAULT_SETTINGS);
   const [locationLoading, setLocationLoading] = useState<boolean>(false);
   const [isAdhanPlaying, setIsAdhanPlaying] = useState<boolean>(false);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState<boolean>(false);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -248,9 +250,90 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.log('[AthanContext] Error pausing player:', e);
     }
     setIsAdhanPlaying(false);
+    setIsPreviewPlaying(false);
     if (stopTimerRef.current) {
       clearTimeout(stopTimerRef.current);
       stopTimerRef.current = null;
+    }
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+  }, [player]);
+
+  const previewSound = useCallback(async (soundType: NotificationSoundType) => {
+    console.log('[AthanContext] Preview sound:', soundType);
+    if (soundType === 'silent') return;
+
+    if (isPreviewPlaying || isAdhanPlaying) {
+      try { player.pause(); } catch (_e) {}
+      setIsPreviewPlaying(false);
+      setIsAdhanPlaying(false);
+      if (previewTimerRef.current) {
+        clearTimeout(previewTimerRef.current);
+        previewTimerRef.current = null;
+      }
+      if (stopTimerRef.current) {
+        clearTimeout(stopTimerRef.current);
+        stopTimerRef.current = null;
+      }
+      return;
+    }
+
+    try {
+      setIsPreviewPlaying(true);
+      player.volume = 1.0;
+      player.muted = false;
+
+      if (soundType === 'athan') {
+        if (player.isLoaded) {
+          player.seekTo(0);
+          player.play();
+        } else {
+          const source = resolvedSource || { uri: ATHAN_WEB_URL };
+          player.replace(source);
+          const loaded = await waitForLoaded(5000);
+          if (loaded) {
+            player.play();
+          } else {
+            console.error('[AthanContext] Preview: could not load audio');
+            setIsPreviewPlaying(false);
+            return;
+          }
+        }
+
+        previewTimerRef.current = setTimeout(() => {
+          console.log('[AthanContext] Preview auto-stop after 8s');
+          try { player.pause(); } catch (_e) {}
+          setIsPreviewPlaying(false);
+          previewTimerRef.current = null;
+        }, 8000);
+      } else if (soundType === 'default') {
+        if (Platform.OS !== 'web') {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'معاينة صوت التنبيه',
+              body: 'هذا هو صوت التنبيه الافتراضي',
+              sound: 'default',
+            },
+            trigger: null,
+          });
+        }
+        setTimeout(() => setIsPreviewPlaying(false), 1500);
+      }
+    } catch (e) {
+      console.error('[AthanContext] Preview error:', e);
+      setIsPreviewPlaying(false);
+    }
+  }, [player, isPreviewPlaying, isAdhanPlaying, resolvedSource, waitForLoaded]);
+
+  const stopPreview = useCallback(() => {
+    console.log('[AthanContext] Stopping preview');
+    try { player.pause(); } catch (_e) {}
+    setIsPreviewPlaying(false);
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
     }
   }, [player]);
 
@@ -617,5 +700,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     stopAthan,
     playerStatus,
     recalculatePrayers,
+    isPreviewPlaying,
+    previewSound,
+    stopPreview,
   };
 });

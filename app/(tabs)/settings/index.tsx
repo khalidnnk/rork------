@@ -28,6 +28,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAthan, NotificationSoundType } from '@/contexts/AthanContext';
+import { Volume1 } from 'lucide-react-native';
 import { PrayerName } from '@/utils/prayerTimes';
 
 const SOUND_OPTIONS: { key: NotificationSoundType; label: string; description: string }[] = [
@@ -210,6 +211,9 @@ export default function SettingsScreen() {
     detectAutoLocation,
     locationLoading,
     updateSettings,
+    isPreviewPlaying,
+    previewSound,
+    stopPreview,
   } = useAthan();
 
   const handlePlayAthan = useCallback(() => {
@@ -254,6 +258,14 @@ export default function SettingsScreen() {
       updateSettings({ notificationSound: sound });
     },
     [updateSettings]
+  );
+
+  const handlePreviewSound = useCallback(
+    (sound: NotificationSoundType) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      previewSound(sound);
+    },
+    [previewSound]
   );
 
   const prayerNames: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
@@ -366,11 +378,30 @@ export default function SettingsScreen() {
                         <Text style={styles.cardRowSubtitle}>{option.description}</Text>
                       </View>
                     </View>
-                    {isActive && (
-                      <View style={styles.activeLabel}>
-                        <Text style={styles.activeLabelText}>مفعّل</Text>
-                      </View>
-                    )}
+                    <View style={styles.soundOptionRight}>
+                      {option.key !== 'silent' && (
+                        <TouchableOpacity
+                          style={[
+                            styles.previewButton,
+                            isPreviewPlaying && isActive && styles.previewButtonActive,
+                          ]}
+                          onPress={() => handlePreviewSound(option.key)}
+                          activeOpacity={0.6}
+                          testID={`preview-${option.key}`}
+                        >
+                          {isPreviewPlaying && isActive ? (
+                            <Square size={13} color={Colors.accent} fill={Colors.accent} />
+                          ) : (
+                            <Volume1 size={16} color={isActive ? Colors.accent : Colors.textSecondary} />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                      {isActive && (
+                        <View style={styles.activeLabel}>
+                          <Text style={styles.activeLabelText}>مفعّل</Text>
+                        </View>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 </View>
               );
@@ -787,6 +818,25 @@ const styles = StyleSheet.create({
   },
   soundOptionActive: {
     color: Colors.accent,
+  },
+  soundOptionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  previewButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  previewButtonActive: {
+    backgroundColor: Colors.accentDim,
+    borderColor: 'rgba(201,168,76,0.3)',
   },
   radioOuter: {
     width: 22,
