@@ -290,13 +290,21 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
           player.seekTo(0);
           player.play();
         } else {
+          const isLocalSource = resolvedSource && typeof resolvedSource === 'object' && 'uri' in resolvedSource && resolvedSource.uri !== ATHAN_WEB_URL;
           const source = resolvedSource || { uri: ATHAN_WEB_URL };
+          console.log('[AthanContext] Preview: player not loaded, replacing with source:', JSON.stringify(source));
           player.replace(source);
-          const loaded = await waitForLoaded(5000);
+          let loaded = await waitForLoaded(5000);
+          if (!loaded && isLocalSource) {
+            console.log('[AthanContext] Preview: local source failed, trying remote URL...');
+            player.replace({ uri: ATHAN_WEB_URL });
+            loaded = await waitForLoaded(5000);
+          }
           if (loaded) {
             player.play();
+            console.log('[AthanContext] Preview: playing successfully');
           } else {
-            console.error('[AthanContext] Preview: could not load audio');
+            console.error('[AthanContext] Preview: could not load audio after retries');
             setIsPreviewPlaying(false);
             return;
           }
