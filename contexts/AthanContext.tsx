@@ -700,7 +700,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     async function scheduleNotifs() {
       const granted = await requestNotificationPermissions();
       if (granted) {
-        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound);
+        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets);
       }
     }
 

@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { PrayerTime, PrayerName } from './prayerTimes';
+import { PrayerTime, PrayerName, calculatePrayerTimes, getTimezoneOffset } from './prayerTimes';
 import { NotificationSoundType } from '@/contexts/AthanContext';
 
 Notifications.setNotificationHandler({
@@ -109,17 +109,54 @@ export async function scheduleAthanNotification(
 export async function scheduleAllNotifications(
   prayers: PrayerTime[],
   enabledPrayers: Record<PrayerName, boolean>,
-  soundType: NotificationSoundType = 'athan'
+  soundType: NotificationSoundType = 'athan',
+  latitude: number = 24.7136,
+  longitude: number = 46.6753,
+  offsets: Record<PrayerName, number> = { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 }
 ): Promise<void> {
   if (Platform.OS === 'web') return;
 
   await Notifications.cancelAllScheduledNotificationsAsync();
   console.log('[Notifications] Cleared all existing notifications, soundType:', soundType);
 
+  let scheduledCount = 0;
   for (const prayer of prayers) {
     if (enabledPrayers[prayer.name]) {
-      await scheduleAthanNotification(prayer, true, soundType);
+      const id = await scheduleAthanNotification(prayer, true, soundType);
+      if (id) scheduledCount++;
     }
+  }
+
+  if (scheduledCount === 0) {
+    console.log('[Notifications] No future prayers today, scheduling tomorrow\'s prayers');
+    await scheduleTomorrowNotifications(latitude, longitude, offsets, enabledPrayers, soundType);
+  }
+}
+
+async function scheduleTomorrowNotifications(
+  latitude: number,
+  longitude: number,
+  offsets: Record<PrayerName, number>,
+  enabledPrayers: Record<PrayerName, boolean>,
+  soundType: NotificationSoundType
+): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tz = getTimezoneOffset();
+
+    const tomorrowPrayers = calculatePrayerTimes(tomorrow, latitude, longitude, tz, offsets);
+
+    for (const prayer of tomorrowPrayers.prayers) {
+      if (enabledPrayers[prayer.name]) {
+        await scheduleAthanNotification(prayer, true, soundType);
+      }
+    }
+    console.log('[Notifications] Tomorrow prayers scheduled');
+  } catch (e) {
+    console.error('[Notifications] Error scheduling tomorrow:', e);
   }
 }
 
