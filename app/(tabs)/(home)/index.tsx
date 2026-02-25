@@ -13,7 +13,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import {
   MapPin,
-
   Clock,
   Sun,
   Sunset,
@@ -25,6 +24,7 @@ import {
   Heart,
   Info,
 } from 'lucide-react-native';
+import { useWindowDimensions } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAthan } from '@/contexts/AthanContext';
@@ -90,10 +90,6 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
             <View style={styles.welcomeIconWrap}>
               <Heart size={32} color={Colors.accent} fill={Colors.accent} />
             </View>
-
-            <Text style={styles.welcomeBismillah}>بسم الله الرحمن الرحيم</Text>
-
-            <View style={styles.welcomeDivider} />
 
             <Text style={styles.welcomeTitle}>عن التطبيق</Text>
 
@@ -227,6 +223,8 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const {
     settings,
     dailyPrayers,
@@ -319,8 +317,13 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <Image
+        source={isTablet ? require('@/assets/images/bg-tablet.png') : require('@/assets/images/bg-phone.png')}
+        style={styles.backgroundImage}
+        contentFit="cover"
+      />
       <LinearGradient
-        colors={['#0F2229', '#0B1A1F', '#091418']}
+        colors={['rgba(15,34,41,0.55)', 'rgba(11,26,31,0.75)', 'rgba(9,20,24,0.9)']}
         style={StyleSheet.absoluteFill}
       />
 
@@ -507,6 +510,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.bg,
   },
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  } as const,
   scrollView: {
     flex: 1,
   },
@@ -774,13 +782,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  welcomeBismillah: {
-    fontSize: 16,
-    fontFamily: 'Dubai-Regular',
-    color: Colors.accent,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
+
   welcomeDivider: {
     width: 40,
     height: 1,
@@ -833,16 +835,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(74,102,112,0.3)',
   },
   aboutMessage: {
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: 'Dubai-Medium',
     color: Colors.accentLight,
     textAlign: 'center',
-    lineHeight: 30,
+    lineHeight: 28,
     marginBottom: 4,
   },
   aboutDua: {
     fontSize: 16,
-    fontFamily: 'Dubai-Bold',
+    fontFamily: 'Dubai-Medium',
     color: Colors.accent,
     textAlign: 'center',
     lineHeight: 28,

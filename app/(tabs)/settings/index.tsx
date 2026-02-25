@@ -8,6 +8,7 @@ import {
   Switch,
   Animated,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -200,6 +201,8 @@ const PRAYER_LABELS_AR: Record<PrayerName, string> = {
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const {
     settings,
     togglePrayer,
@@ -273,8 +276,13 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
+      <Image
+        source={isTablet ? require('@/assets/images/bg-tablet.png') : require('@/assets/images/bg-phone.png')}
+        style={styles.backgroundImage}
+        contentFit="cover"
+      />
       <LinearGradient
-        colors={['#0F2229', '#0B1A1F', '#091418']}
+        colors={['rgba(15,34,41,0.55)', 'rgba(11,26,31,0.75)', 'rgba(9,20,24,0.9)']}
         style={StyleSheet.absoluteFill}
       />
 
@@ -577,6 +585,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.bg,
   },
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  } as const,
   scrollView: {
     flex: 1,
   },
