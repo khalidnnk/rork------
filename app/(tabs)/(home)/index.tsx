@@ -181,13 +181,9 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
               <Heart size={32} color={Colors.accent} fill={Colors.accent} />
             </View>
 
-            <Text style={styles.welcomeBismillah}>بسم الله الرحمن الرحيم</Text>
-
-            <View style={styles.welcomeDivider} />
-
             <Text style={styles.welcomeTitle}>أذان السليماني</Text>
 
-            <Text style={styles.welcomeMessage}>
+            <Text style={styles.aboutMessage}>
               ليبقى أثر صوته حاضرًا،{'\n'}
               يصدح بالأذان في كل وقت صلاة
             </Text>

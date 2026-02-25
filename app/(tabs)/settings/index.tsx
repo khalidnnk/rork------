@@ -555,7 +555,6 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <View style={styles.cardRowLeft}>
-                <Info size={18} color={Colors.textSecondary} />
                 <View style={styles.cardRowTextWrap}>
                   <Text style={styles.cardRowTitle}>تقويم أم القرى (مكة)</Text>
                   <Text style={styles.cardRowSubtitle}>
