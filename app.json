@@ -11,16 +11,16 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0B1A1F"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "app.rork.alsulaimani-athan"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0B1A1F"
       },
       "package": "app.rork.alsulaimani_athan"
     },
@@ -41,7 +41,8 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/audio/haya-ala-salah.m4a"
+            "./assets/audio/haya-ala-salah.m4a",
+            "./assets/audio/athan.mp3"
           ]
         }
       ]
