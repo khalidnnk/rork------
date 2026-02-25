@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 13,
     fontFamily: 'Dubai-Regular',
-    color: Colors.textMuted,
+    color: '#FFFFFF',
     writingDirection: 'rtl',
   },
   countdownCard: {
