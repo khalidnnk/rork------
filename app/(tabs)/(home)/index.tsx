@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 13,
     fontFamily: 'Dubai-Regular',
-    color: 'rgba(255,255,255,0.75)',
+    color: '#FFFFFF',
   },
   dateText: {
     fontSize: 13,
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
   countdownPrayerEn: {
     fontSize: 14,
     fontFamily: 'Dubai-Regular',
-    color: 'rgba(255,255,255,0.7)' ,
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
     marginBottom: 18,
   },
@@ -632,20 +632,20 @@ const styles = StyleSheet.create({
   timerUnit: {
     fontSize: 10,
     fontFamily: 'Dubai-Regular',
-    color: 'rgba(255,255,255,0.55)',
+    color: 'rgba(255,255,255,0.75)',
     marginTop: 4,
   },
   timerColon: {
     fontSize: 28,
     fontFamily: 'Dubai-Light',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.7)',
     marginHorizontal: 8,
     marginTop: -16,
   },
   countdownTime: {
     fontSize: 14,
     fontFamily: 'Dubai-Regular',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.85)',
     fontVariant: ['tabular-nums'],
   },
   sectionHeader: {
@@ -662,7 +662,7 @@ const styles = StyleSheet.create({
   sectionSubtitle: {
     fontSize: 11,
     fontFamily: 'Dubai-Regular',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.7)',
   },
   prayerList: {
     gap: 8,
@@ -721,13 +721,13 @@ const styles = StyleSheet.create({
   prayerNameEn: {
     fontSize: 12,
     fontFamily: 'Dubai-Regular',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.85)',
   },
   prayerNameActive: {
     color: Colors.accentLight,
   },
   prayerNamePast: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.6)',
   },
   offsetBadge: {
     fontSize: 10,
@@ -748,7 +748,7 @@ const styles = StyleSheet.create({
     color: Colors.accent,
   },
   prayerTimePast: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.6)',
   },
   welcomeOverlay: {
     flex: 1,
