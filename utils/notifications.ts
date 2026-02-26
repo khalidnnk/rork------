@@ -70,6 +70,9 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       name: 'Athan Alerts',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
+      sound: 'default',
+      enableVibrate: true,
+      showBadge: false,
     });
   }
 
@@ -125,7 +128,7 @@ export async function scheduleAthanNotification(
     }
 
     if (Platform.OS === 'ios') {
-      (notificationContent as any).interruptionLevel = 'timeSensitive';
+      (notificationContent as any).interruptionLevel = 'active';
       notificationContent.categoryIdentifier = getIOSNotificationCategory(soundType);
     }
 
