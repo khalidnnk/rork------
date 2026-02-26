@@ -27,6 +27,17 @@ function getNotificationSound(soundType: NotificationSoundType): boolean | strin
   }
 }
 
+function getIOSNotificationCategory(soundType: NotificationSoundType): string {
+  switch (soundType) {
+    case 'athan':
+      return 'athan_haya';
+    case 'full_athan':
+      return 'athan_full';
+    default:
+      return 'athan_default';
+  }
+}
+
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (Platform.OS === 'web') {
     console.log('[Notifications] Web platform - skipping permission request');
@@ -42,10 +53,11 @@ export async function requestNotificationPermissions(): Promise<boolean> {
         allowAlert: true,
         allowSound: true,
         allowBadge: false,
-        allowCriticalAlerts: true,
+        allowProvisional: false,
       },
     });
     finalStatus = status;
+    console.log('[Notifications] iOS permission result:', status);
   }
 
   if (finalStatus !== 'granted') {
@@ -59,6 +71,23 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
     });
+  }
+
+  if (Platform.OS === 'ios') {
+    try {
+      await Notifications.setNotificationCategoryAsync('athan_haya', [], {
+        allowInCarPlay: true,
+      });
+      await Notifications.setNotificationCategoryAsync('athan_full', [], {
+        allowInCarPlay: true,
+      });
+      await Notifications.setNotificationCategoryAsync('athan_default', [], {
+        allowInCarPlay: true,
+      });
+      console.log('[Notifications] iOS notification categories set');
+    } catch (e) {
+      console.log('[Notifications] Error setting iOS categories:', e);
+    }
   }
 
   console.log('[Notifications] Permission granted');
@@ -83,15 +112,31 @@ export async function scheduleAthanNotification(
   console.log(`[Notifications] Sound for ${prayer.name}: ${sound} (type: ${soundType})`);
 
   try {
+    const notificationContent: Notifications.NotificationContentInput = {
+      title: `حان وقت صلاة ${prayer.labelAr}`,
+      body: `${prayer.label} - ${prayer.timeStr}`,
+      sound: sound,
+      data: { prayerName: prayer.name, time: prayer.timeStr },
+    };
+
+    if (Platform.OS === 'android') {
+      notificationContent.priority = Notifications.AndroidNotificationPriority.MAX;
+      (notificationContent as any).channelId = 'athan';
+    }
+
+    if (Platform.OS === 'ios') {
+      (notificationContent as any).interruptionLevel = 'timeSensitive';
+      notificationContent.categoryIdentifier = getIOSNotificationCategory(soundType);
+    }
+
+    console.log(`[Notifications] iOS content for ${prayer.name}:`, JSON.stringify({
+      sound: notificationContent.sound,
+      interruptionLevel: (notificationContent as any).interruptionLevel,
+      categoryIdentifier: notificationContent.categoryIdentifier,
+    }));
+
     const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: `حان وقت صلاة ${prayer.labelAr}`,
-        body: `${prayer.label} - ${prayer.timeStr}`,
-        sound: sound,
-        priority: Notifications.AndroidNotificationPriority.MAX,
-        ...(Platform.OS === 'android' ? { channelId: 'athan' } : {}),
-        data: { prayerName: prayer.name, time: prayer.timeStr },
-      },
+      content: notificationContent,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: Math.max(1, secondsUntil),

@@ -363,10 +363,10 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
-    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
       const data = notification.request.content.data;
       if (data?.prayerName) {
-        console.log('[AthanContext] Prayer notification received for:', data.prayerName);
+        console.log('[AthanContext] Prayer notification received (foreground) for:', data.prayerName);
         const prayerName = data.prayerName as PrayerName;
         if (settings.globalEnabled && settings.enabledPrayers[prayerName]) {
           const soundType = settings.notificationSound;
@@ -378,8 +378,25 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       }
     });
 
-    return () => subscription.remove();
-  }, [settings.globalEnabled, settings.enabledPrayers, playAthan]);
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.prayerName) {
+        console.log('[AthanContext] Notification tapped (from background) for:', data.prayerName);
+        const prayerName = data.prayerName as PrayerName;
+        if (settings.globalEnabled && settings.enabledPrayers[prayerName]) {
+          const soundType = settings.notificationSound;
+          if (soundType === 'athan' || soundType === 'full_athan') {
+            playAthanWithType(soundType);
+          }
+        }
+      }
+    });
+
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
+  }, [settings.globalEnabled, settings.enabledPrayers, playAthanWithType]);
 
   const settingsQuery = useQuery({
     queryKey: ['athan-settings'],
