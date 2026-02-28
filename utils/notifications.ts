@@ -38,6 +38,40 @@ function getIOSNotificationCategory(soundType: NotificationSoundType): string {
   }
 }
 
+async function setupNotificationCategories(): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+  try {
+    await Notifications.setNotificationCategoryAsync('athan_full', [
+      {
+        identifier: 'OPEN_ATHAN',
+        buttonTitle: 'استمع للأذان كاملاً',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+    ], {
+      allowInCarPlay: true,
+    });
+    await Notifications.setNotificationCategoryAsync('athan_haya', [
+      {
+        identifier: 'OPEN_ATHAN',
+        buttonTitle: 'فتح التطبيق',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+    ], {
+      allowInCarPlay: true,
+    });
+    await Notifications.setNotificationCategoryAsync('athan_default', [], {
+      allowInCarPlay: true,
+    });
+    console.log('[Notifications] iOS notification categories with actions set');
+  } catch (e) {
+    console.log('[Notifications] Error setting iOS categories:', e);
+  }
+}
+
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (Platform.OS === 'web') {
     console.log('[Notifications] Web platform - skipping permission request');
@@ -76,22 +110,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     });
   }
 
-  if (Platform.OS === 'ios') {
-    try {
-      await Notifications.setNotificationCategoryAsync('athan_haya', [], {
-        allowInCarPlay: true,
-      });
-      await Notifications.setNotificationCategoryAsync('athan_full', [], {
-        allowInCarPlay: true,
-      });
-      await Notifications.setNotificationCategoryAsync('athan_default', [], {
-        allowInCarPlay: true,
-      });
-      console.log('[Notifications] iOS notification categories set');
-    } catch (e) {
-      console.log('[Notifications] Error setting iOS categories:', e);
-    }
-  }
+  await setupNotificationCategories();
 
   console.log('[Notifications] Permission granted');
   return true;
@@ -117,9 +136,11 @@ export async function scheduleAthanNotification(
   try {
     const notificationContent: Notifications.NotificationContentInput = {
       title: `حان وقت صلاة ${prayer.labelAr}`,
-      body: `${prayer.label} - ${prayer.timeStr}`,
+      body: soundType === 'full_athan'
+        ? `${prayer.label} - ${prayer.timeStr} | اسحب للاستماع للأذان كاملاً`
+        : `${prayer.label} - ${prayer.timeStr}`,
       sound: sound,
-      data: { prayerName: prayer.name, time: prayer.timeStr },
+      data: { prayerName: prayer.name, time: prayer.timeStr, soundType },
     };
 
     if (Platform.OS === 'android') {
@@ -128,7 +149,7 @@ export async function scheduleAthanNotification(
     }
 
     if (Platform.OS === 'ios') {
-      (notificationContent as any).interruptionLevel = 'active';
+      (notificationContent as any).interruptionLevel = 'timeSensitive';
       notificationContent.categoryIdentifier = getIOSNotificationCategory(soundType);
     }
 

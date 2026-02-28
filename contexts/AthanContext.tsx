@@ -380,11 +380,13 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
+      const actionId = response.actionIdentifier;
+      console.log('[AthanContext] Notification response, actionId:', actionId, 'data:', JSON.stringify(data));
       if (data?.prayerName) {
-        console.log('[AthanContext] Notification tapped (from background) for:', data.prayerName);
         const prayerName = data.prayerName as PrayerName;
-        if (settings.globalEnabled && settings.enabledPrayers[prayerName]) {
-          const soundType = settings.notificationSound;
+        const soundType = (data.soundType as NotificationSoundType) || settings.notificationSound;
+        console.log('[AthanContext] Notification tapped/action for:', prayerName, 'soundType:', soundType, 'action:', actionId);
+        if (actionId === 'OPEN_ATHAN' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           if (soundType === 'athan' || soundType === 'full_athan') {
             playAthanWithType(soundType);
           }
@@ -426,11 +428,13 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
   const updateSettings = useCallback(
     (partial: Partial<AthanSettings>) => {
-      const updated = { ...settings, ...partial };
-      setSettings(updated);
-      saveMutation.mutate(updated);
+      setSettings(prev => {
+        const updated = { ...prev, ...partial };
+        saveMutation.mutate(updated);
+        return updated;
+      });
     },
-    [settings, saveMutation]
+    [saveMutation]
   );
 
   const togglePrayer = useCallback(
