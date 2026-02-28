@@ -116,6 +116,20 @@ function asrTime(
   return noon + HA;
 }
 
+function isRamadan(date: Date): boolean {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
+      month: 'numeric',
+    });
+    const hijriMonth = parseInt(formatter.format(date), 10);
+    console.log('[PrayerTimes] Hijri month (Umm Al-Qura):', hijriMonth, hijriMonth === 9 ? '(Ramadan)' : '');
+    return hijriMonth === 9;
+  } catch (e) {
+    console.warn('[PrayerTimes] Could not determine Hijri month:', e);
+    return false;
+  }
+}
+
 function hoursToDate(hours: number, baseDate: Date): Date {
   const h = Math.floor(hours);
   const minFloat = (hours - h) * 60;
@@ -160,7 +174,8 @@ export function calculatePrayerTimes(
   const FAJR_ANGLE = -18.5;
   const SUNRISE_ANGLE = -0.833;
   const ASR_FACTOR = 1;
-  const ISHA_MINUTES = 90;
+  const isRamadanNow = isRamadan(date);
+  const ISHA_MINUTES = isRamadanNow ? 120 : 90;
 
   const fajrHours = sunAngleTime(jd, FAJR_ANGLE, lat, tz, lng, 'ccw');
   const dhuhrHours = midDay(jd, tz, lng) + 1 / 60;
