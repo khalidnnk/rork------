@@ -25,6 +25,9 @@ import {
   Compass,
   Info,
   Navigation,
+  Moon,
+  Sun,
+  Calculator,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -555,15 +558,44 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <View style={styles.cardRowLeft}>
+                <Calculator size={18} color={Colors.accent} />
                 <View style={styles.cardRowTextWrap}>
                   <Text style={styles.cardRowTitle}>تقويم أم القرى (مكة)</Text>
-                  <Text style={styles.cardRowSubtitle}>
-                    الفجر: 18.5° | العشاء: 90 دقيقة بعد المغرب
-                  </Text>
                 </View>
               </View>
               <View style={styles.lockedLabel}>
                 <Text style={styles.lockedLabelText}>ثابت</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.calcDetailRow}>
+              <View style={styles.calcDetailItem}>
+                <Sun size={14} color={Colors.textSecondary} />
+                <Text style={styles.calcDetailLabel}>الفجر</Text>
+                <Text style={styles.calcDetailValue}>18.5°</Text>
+              </View>
+              <View style={styles.calcDetailSeparator} />
+              <View style={styles.calcDetailItem}>
+                <Moon size={14} color={Colors.textSecondary} />
+                <Text style={styles.calcDetailLabel}>العشاء</Text>
+                <Text style={styles.calcDetailValue}>90 د بعد المغرب</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.calcRamadanRow}>
+              <View style={styles.ramadanBadge}>
+                <Moon size={12} color={Colors.accent} />
+                <Text style={styles.ramadanBadgeText}>رمضان</Text>
+              </View>
+              <View style={styles.calcDetailTextWrap}>
+                <Text style={styles.calcRamadanTitle}>العشاء في رمضان</Text>
+                <Text style={styles.calcRamadanSubtitle}>
+                  120 دقيقة بعد المغرب (بدلاً من 90)
+                </Text>
               </View>
             </View>
           </View>
@@ -785,6 +817,71 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
     backgroundColor: Colors.surface,
+  },
+  calcDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 0,
+  },
+  calcDetailItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  calcDetailSeparator: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.separator,
+  },
+  calcDetailLabel: {
+    fontSize: 13,
+    fontFamily: 'Dubai-Medium',
+    color: Colors.textSecondary,
+  },
+  calcDetailValue: {
+    fontSize: 13,
+    fontFamily: 'Dubai-Bold',
+    color: Colors.text,
+  },
+  calcRamadanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  ramadanBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.accentDim,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  ramadanBadgeText: {
+    fontSize: 11,
+    fontFamily: 'Dubai-Bold',
+    color: Colors.accent,
+  },
+  calcDetailTextWrap: {
+    flex: 1,
+  },
+  calcRamadanTitle: {
+    fontSize: 14,
+    fontFamily: 'Dubai-Medium',
+    color: Colors.text,
+  },
+  calcRamadanSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Dubai-Regular',
+    color: Colors.textSecondary,
+    marginTop: 1,
   },
   lockedLabelText: {
     fontSize: 11,
