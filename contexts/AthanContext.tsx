@@ -522,9 +522,20 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         return;
       }
 
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      let loc: Location.LocationObject | null = null;
+      try {
+        loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+        });
+      } catch (posErr) {
+        console.log('[AthanContext] getCurrentPositionAsync failed, trying last known:', posErr);
+        loc = await Location.getLastKnownPositionAsync();
+      }
+
+      if (!loc) {
+        console.log('[AthanContext] No location available, keeping current settings');
+        return;
+      }
 
       const lat = loc.coords.latitude;
       const lng = loc.coords.longitude;
