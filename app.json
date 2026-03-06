@@ -16,7 +16,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.rork.alsulaimani-athan"
-    },
+  "infoPlist": {
+  "NSLocationWhenInUseUsageDescription": "Alsulaimani Athan uses your location to determine your city and calculate accurate Islamic prayer times (Fajr, Dhuhr, Asr, Maghrib, and Isha) based on your geographic coordinates. For example, your latitude and longitude are used to compute the exact sunrise and sunset angles for your area so that prayer time notifications are sent at the correct times."
+}
+}
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
