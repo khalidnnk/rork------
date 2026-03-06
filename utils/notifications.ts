@@ -19,7 +19,9 @@ function getNotificationSound(soundType: NotificationSoundType): boolean | strin
     case 'athan':
       return 'haya-ala-salah.m4a';
     case 'full_athan':
-      return 'athan.mp3';
+      return 'athan.m4a';
+    case 'allahu_akbar':
+      return 'allahu-akbar.m4a';
     case 'default':
       return true;
     case 'silent':
@@ -33,6 +35,8 @@ function getIOSNotificationCategory(soundType: NotificationSoundType): string {
       return 'athan_haya';
     case 'full_athan':
       return 'athan_full';
+    case 'allahu_akbar':
+      return 'athan_akbar';
     default:
       return 'athan_default';
   }
@@ -53,6 +57,17 @@ async function setupNotificationCategories(): Promise<void> {
       allowInCarPlay: true,
     });
     await Notifications.setNotificationCategoryAsync('athan_haya', [
+      {
+        identifier: 'OPEN_ATHAN',
+        buttonTitle: 'فتح التطبيق',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+    ], {
+      allowInCarPlay: true,
+    });
+    await Notifications.setNotificationCategoryAsync('athan_akbar', [
       {
         identifier: 'OPEN_ATHAN',
         buttonTitle: 'فتح التطبيق',
@@ -137,7 +152,7 @@ export async function scheduleAthanNotification(
     const notificationContent: Notifications.NotificationContentInput = {
       title: `حان وقت صلاة ${prayer.labelAr}`,
       body: soundType === 'full_athan'
-        ? `${prayer.label} - ${prayer.timeStr} | اسحب للاستماع للأذان كاملاً`
+        ? `${prayer.label} - ${prayer.timeStr} | افتح للاستماع للأذان كاملاً`
         : `${prayer.label} - ${prayer.timeStr}`,
       sound: sound,
       data: { prayerName: prayer.name, time: prayer.timeStr, soundType },

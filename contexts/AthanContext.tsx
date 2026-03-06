@@ -25,12 +25,15 @@ import {
 const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 300;
 
-const fullAthanModule = require('@/assets/audio/athan.mp3');
+const fullAthanModule = require('@/assets/audio/athan.m4a');
 const hayaModule = require('@/assets/audio/haya-ala-salah.m4a');
-const FULL_ATHAN_WEB_URL = 'https://r2-pub.rork.com/attachments/i1kbtyujmwc57cfnj3z5w';
+const allahuAkbarModule = require('@/assets/audio/allahu-akbar.m4a');
+const FULL_ATHAN_WEB_URL = 'https://r2-pub.rork.com/attachments/z0hdqpl2rrummm8nej54s';
 const HAYA_WEB_URL = 'https://r2-pub.rork.com/attachments/hlw21fvf05k0k9b6432nz';
+const ALLAHU_AKBAR_WEB_URL = 'https://r2-pub.rork.com/attachments/er1fm5r0twtn9sod0fbrh';
+const NOTIFICATION_ATHAN_RESUME_POSITION = 30;
 
-export type NotificationSoundType = 'athan' | 'full_athan' | 'default' | 'silent';
+export type NotificationSoundType = 'athan' | 'full_athan' | 'allahu_akbar' | 'default' | 'silent';
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -105,16 +108,20 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
   const [resolvedFullAthan, setResolvedFullAthan] = useState<{ uri: string } | null>(null);
   const [resolvedHaya, setResolvedHaya] = useState<{ uri: string } | null>(null);
+  const [resolvedAllahuAkbar, setResolvedAllahuAkbar] = useState<{ uri: string } | null>(null);
   const sourceResolved = useRef<boolean>(false);
+  const _notificationResumeRef = useRef<boolean>(false);
 
   const getSourceForType = useCallback((type: NotificationSoundType): { uri: string } | null => {
     if (type === 'full_athan') return resolvedFullAthan;
     if (type === 'athan') return resolvedHaya;
+    if (type === 'allahu_akbar') return resolvedAllahuAkbar;
     return null;
-  }, [resolvedFullAthan, resolvedHaya]);
+  }, [resolvedFullAthan, resolvedHaya, resolvedAllahuAkbar]);
 
   const getWebUrlForType = useCallback((type: NotificationSoundType): string => {
     if (type === 'full_athan') return FULL_ATHAN_WEB_URL;
+    if (type === 'allahu_akbar') return ALLAHU_AKBAR_WEB_URL;
     return HAYA_WEB_URL;
   }, []);
 
@@ -127,6 +134,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         console.log('[AthanContext] Web platform - using remote URLs');
         setResolvedFullAthan({ uri: FULL_ATHAN_WEB_URL });
         setResolvedHaya({ uri: HAYA_WEB_URL });
+        setResolvedAllahuAkbar({ uri: ALLAHU_AKBAR_WEB_URL });
         return;
       }
 
@@ -134,10 +142,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         console.log('[AthanContext] Resolving local audio assets...');
         const fullAsset = Asset.fromModule(fullAthanModule);
         const hayaAsset = Asset.fromModule(hayaModule);
-        await Promise.all([fullAsset.downloadAsync(), hayaAsset.downloadAsync()]);
+        const akbarAsset = Asset.fromModule(allahuAkbarModule);
+        await Promise.all([fullAsset.downloadAsync(), hayaAsset.downloadAsync(), akbarAsset.downloadAsync()]);
 
         const fullUri = fullAsset.localUri || fullAsset.uri;
         const hayaUri = hayaAsset.localUri || hayaAsset.uri;
+        const akbarUri = akbarAsset.localUri || akbarAsset.uri;
 
         if (fullUri) {
           setResolvedFullAthan({ uri: fullUri });
@@ -152,17 +162,29 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         } else {
           setResolvedHaya({ uri: HAYA_WEB_URL });
         }
+
+        if (akbarUri) {
+          setResolvedAllahuAkbar({ uri: akbarUri });
+          console.log('[AthanContext] Allahu Akbar source set to:', akbarUri);
+        } else {
+          setResolvedAllahuAkbar({ uri: ALLAHU_AKBAR_WEB_URL });
+        }
       } catch (e) {
         console.error('[AthanContext] Error resolving audio assets:', e);
         setResolvedFullAthan({ uri: FULL_ATHAN_WEB_URL });
         setResolvedHaya({ uri: HAYA_WEB_URL });
+        setResolvedAllahuAkbar({ uri: ALLAHU_AKBAR_WEB_URL });
       }
     }
 
     resolveAudioSources();
   }, []);
 
-  const currentSource = settings.notificationSound === 'full_athan' ? resolvedFullAthan : resolvedHaya;
+  const currentSource = settings.notificationSound === 'full_athan'
+    ? resolvedFullAthan
+    : settings.notificationSound === 'allahu_akbar'
+      ? resolvedAllahuAkbar
+      : resolvedHaya;
   const player = useAudioPlayer(currentSource);
   const playerStatus = useAudioPlayerStatus(player);
 
@@ -216,25 +238,37 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     return false;
   }, [player]);
 
-  const playAthanWithType = useCallback(async (soundType: NotificationSoundType = 'full_athan') => {
-    console.log('[AthanContext] Playing athan type:', soundType, 'isLoaded:', player.isLoaded);
+  const playAthanWithType = useCallback(async (soundType: NotificationSoundType = 'full_athan', resumeFromNotification: boolean = false) => {
+    console.log('[AthanContext] Playing athan type:', soundType, 'isLoaded:', player.isLoaded, 'resume:', resumeFromNotification);
     try {
       setIsAdhanPlaying(true);
       player.volume = 1.0;
       player.muted = false;
 
-      const source = getSourceForType(soundType) || { uri: getWebUrlForType(soundType) };
+      const actualType = (resumeFromNotification && soundType === 'full_athan') ? 'full_athan' : soundType;
+      const source = getSourceForType(actualType) || { uri: getWebUrlForType(actualType) };
 
       player.replace(source);
       const loaded = await waitForLoaded(5000);
       if (loaded) {
+        if (resumeFromNotification && soundType === 'full_athan') {
+          try {
+            player.seekTo(NOTIFICATION_ATHAN_RESUME_POSITION);
+            console.log('[AthanContext] Seeking to', NOTIFICATION_ATHAN_RESUME_POSITION, 's to continue after notification');
+          } catch (seekErr) {
+            console.log('[AthanContext] Seek error, playing from start:', seekErr);
+          }
+        }
         player.play();
         console.log('[AthanContext] Player loaded and playing type:', soundType);
       } else {
         console.log('[AthanContext] Trying fallback URL for type:', soundType);
-        player.replace({ uri: getWebUrlForType(soundType) });
+        player.replace({ uri: getWebUrlForType(actualType) });
         const fallbackLoaded = await waitForLoaded(5000);
         if (fallbackLoaded) {
+          if (resumeFromNotification && soundType === 'full_athan') {
+            try { player.seekTo(NOTIFICATION_ATHAN_RESUME_POSITION); } catch (_e) {}
+          }
           player.play();
         } else {
           console.error('[AthanContext] Could not load audio, aborting');
@@ -371,8 +405,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         if (settings.globalEnabled && settings.enabledPrayers[prayerName]) {
           const soundType = settings.notificationSound;
           console.log('[AthanContext] Auto-playing athan for notification:', prayerName, 'soundType:', soundType);
-          if (soundType === 'athan' || soundType === 'full_athan') {
-            playAthanWithType(soundType);
+          if (soundType === 'athan' || soundType === 'full_athan' || soundType === 'allahu_akbar') {
+            playAthanWithType(soundType, false);
           }
         }
       }
@@ -387,8 +421,9 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         const soundType = (data.soundType as NotificationSoundType) || settings.notificationSound;
         console.log('[AthanContext] Notification tapped/action for:', prayerName, 'soundType:', soundType, 'action:', actionId);
         if (actionId === 'OPEN_ATHAN' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-          if (soundType === 'athan' || soundType === 'full_athan') {
-            playAthanWithType(soundType);
+          if (soundType === 'athan' || soundType === 'full_athan' || soundType === 'allahu_akbar') {
+            const shouldResume = soundType === 'full_athan';
+            playAthanWithType(soundType, shouldResume);
           }
         }
       }
