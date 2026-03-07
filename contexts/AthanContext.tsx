@@ -367,7 +367,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
           return;
         }
 
-        const previewDuration = soundType === 'full_athan' ? 10000 : soundType === 'allahu_akbar' ? 6000 : 8000;
+        const previewDuration = soundType === 'full_athan' ? 10000 : soundType === 'allahu_akbar' ? 30000 : 8000;
         previewTimerRef.current = setTimeout(() => {
           console.log('[AthanContext] Preview auto-stop');
           try { player.pause(); } catch { /* pause error */ }
