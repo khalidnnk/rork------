@@ -23,7 +23,6 @@ import {
   Play,
   Square,
   Compass,
-  Info,
   Navigation,
   Moon,
   Sun,
@@ -105,10 +104,10 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
         rotate.stop();
       };
     }
-  }, [visible]);
+  }, [visible, fadeAnim, scaleAnim, waveAnim1, waveAnim2, waveAnim3, glowAnim, rotateAnim]);
 
   const handleStop = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 0.9, duration: 200, useNativeDriver: true }),
@@ -220,23 +219,24 @@ export default function SettingsScreen() {
     locationLoading,
     updateSettings,
     isPreviewPlaying,
+    previewingSoundType,
     previewSound,
-    stopPreview,
+    stopPreview: _stopPreview,
   } = useAthan();
 
   const handlePlayAthan = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    playAthan();
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void playAthan();
   }, [playAthan]);
 
   const handleStopAthan = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     stopAthan();
   }, [stopAthan]);
 
   const handleTogglePrayer = useCallback(
     (name: PrayerName) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       togglePrayer(name);
     },
     [togglePrayer]
@@ -244,25 +244,25 @@ export default function SettingsScreen() {
 
   const handleSetOffset = useCallback(
     (name: PrayerName, offset: number) => {
-      Haptics.selectionAsync();
+      void Haptics.selectionAsync();
       setOffset(name, offset);
     },
     [setOffset]
   );
 
   const handleToggleGlobal = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     toggleGlobal();
   }, [toggleGlobal]);
 
   const handleRefreshLocation = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    detectAutoLocation();
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void detectAutoLocation();
   }, [detectAutoLocation]);
 
   const handleSoundChange = useCallback(
     (sound: NotificationSoundType) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       updateSettings({ notificationSound: sound });
     },
     [updateSettings]
@@ -270,8 +270,8 @@ export default function SettingsScreen() {
 
   const handlePreviewSound = useCallback(
     (sound: NotificationSoundType) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      previewSound(sound);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void previewSound(sound);
     },
     [previewSound]
   );
@@ -396,13 +396,13 @@ export default function SettingsScreen() {
                         <TouchableOpacity
                           style={[
                             styles.previewButton,
-                            isPreviewPlaying && settings.notificationSound === option.key && styles.previewButtonActive,
+                            isPreviewPlaying && previewingSoundType === option.key && styles.previewButtonActive,
                           ]}
                           onPress={() => handlePreviewSound(option.key)}
                           activeOpacity={0.6}
                           testID={`preview-${option.key}`}
                         >
-                          {isPreviewPlaying && settings.notificationSound === option.key ? (
+                          {isPreviewPlaying && previewingSoundType === option.key ? (
                             <Square size={13} color={Colors.accent} fill={Colors.accent} />
                           ) : (
                             <Volume1 size={16} color={isActive ? Colors.accent : Colors.textSecondary} />
