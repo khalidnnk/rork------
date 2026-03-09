@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,9 @@ import Colors from '@/constants/colors';
 import { useAthan, NotificationSoundType } from '@/contexts/AthanContext';
 import { Volume1 } from 'lucide-react-native';
 import { PrayerName } from '@/utils/prayerTimes';
+import CityPickerModal from '@/components/CityPickerModal';
+import { City } from '@/constants/cities';
+import { List } from 'lucide-react-native';
 
 const SOUND_OPTIONS: { key: NotificationSoundType; label: string; description: string }[] = [
   { key: 'full_athan', label: 'الأذان كاملاً', description: '٣٠ ثانية في التنبيه ويكمل داخل التطبيق' },
@@ -275,6 +278,25 @@ export default function SettingsScreen() {
     },
     [previewSound]
   );
+
+  const [cityPickerVisible, setCityPickerVisible] = useState<boolean>(false);
+
+  const handleSelectCity = useCallback((city: City) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    updateSettings({
+      latitude: city.latitude,
+      longitude: city.longitude,
+      timezone: city.timezone,
+      locationName: city.nameAr,
+      locationMode: 'manual',
+    });
+    setCityPickerVisible(false);
+  }, [updateSettings]);
+
+  const handleOpenCityPicker = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCityPickerVisible(true);
+  }, []);
 
   const prayerNames: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 
@@ -540,19 +562,40 @@ export default function SettingsScreen() {
 
             <View style={styles.divider} />
 
-            <TouchableOpacity
-              style={styles.refreshLocationRow}
-              onPress={handleRefreshLocation}
-              activeOpacity={0.7}
-              testID="refresh-location"
-            >
-              <Navigation size={16} color={Colors.teal} />
-              <Text style={styles.refreshLocationText}>
-                {locationLoading ? 'جارٍ التحديث...' : 'تحديث الموقع عبر GPS'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.locationActionsRow}>
+              <TouchableOpacity
+                style={styles.locationActionButton}
+                onPress={handleRefreshLocation}
+                activeOpacity={0.7}
+                testID="refresh-location"
+              >
+                <Navigation size={15} color={Colors.teal} />
+                <Text style={styles.locationActionTextTeal}>
+                  {locationLoading ? 'جارٍ التحديث...' : 'تحديد تلقائي GPS'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.locationActionDivider} />
+
+              <TouchableOpacity
+                style={styles.locationActionButton}
+                onPress={handleOpenCityPicker}
+                activeOpacity={0.7}
+                testID="open-city-picker"
+              >
+                <List size={15} color={Colors.accent} />
+                <Text style={styles.locationActionTextAccent}>اختيار المدينة يدوياً</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+
+        <CityPickerModal
+          visible={cityPickerVisible}
+          onClose={() => setCityPickerVisible(false)}
+          onSelectCity={handleSelectCity}
+          currentCityName={settings.locationName}
+        />
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>طريقة الحساب</Text>
@@ -901,18 +944,32 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     opacity: 0.7,
   },
-  refreshLocationRow: {
+  locationActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationActionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 7,
     paddingVertical: 14,
-    paddingHorizontal: 16,
   },
-  refreshLocationText: {
-    fontSize: 14,
+  locationActionDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: Colors.separator,
+  },
+  locationActionTextTeal: {
+    fontSize: 13,
     fontFamily: 'Dubai-Medium',
     color: Colors.teal,
+  },
+  locationActionTextAccent: {
+    fontSize: 13,
+    fontFamily: 'Dubai-Medium',
+    color: Colors.accent,
   },
   soundOptionRow: {
     flexDirection: 'row',
