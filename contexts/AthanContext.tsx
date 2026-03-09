@@ -470,8 +470,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       setSettings(settingsQuery.data);
       if (!hasAutoDetected.current) {
         hasAutoDetected.current = true;
-        console.log('[AthanContext] Auto-detecting GPS location on startup');
-        void detectAutoLocationSilent();
+        console.log('[AthanContext] Settings loaded, skipping auto-detect (handled by onboarding)');
       }
     }
   }, [settingsQuery.data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -540,7 +539,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     [updateSettings]
   );
 
-  const detectAutoLocationSilent = useCallback(async () => {
+  const _detectAutoLocationSilent = useCallback(async () => {
     try {
       if (Platform.OS === 'web') {
         if ('geolocation' in navigator) {
