@@ -17,11 +17,11 @@ Notifications.setNotificationHandler({
 function getNotificationSound(soundType: NotificationSoundType): boolean | string {
   switch (soundType) {
     case 'athan':
-      return 'haya-ala-salah.m4a';
+      return 'haya_ala_salah.m4a';
     case 'full_athan':
       return 'athan.m4a';
     case 'allahu_akbar':
-      return 'allahu-akbar.m4a';
+      return 'allahu_akbar.m4a';
     case 'default':
       return true;
     case 'silent':
