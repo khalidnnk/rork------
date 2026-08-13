@@ -2,7 +2,7 @@
   "expo": {
     "name": "Alsulaimani Athan",
     "slug": "alsulaimani-athan",
-    "version": "1.0.1",
+    "version": "1.3.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "rork-app",
@@ -16,9 +16,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.rork.alsulaimani-athan",
-      "buildNumber": "2",
+      "buildNumber": "16",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Alsulaimani Athan uses your location while you use the app to identify your city, calculate accurate prayer times, and schedule Athan notifications for your area. Your location is not shared or stored outside your device."
+        "NSLocationWhenInUseUsageDescription": "يستخدم أذان السليماني موقعك أثناء استخدام التطبيق لتحديد مدينتك وحساب مواقيت الصلاة وجدولة تنبيهات الأذان حسب منطقتك."
       }
     },
     "android": {
@@ -68,7 +68,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Alsulaimani Athan uses your location while you use the app to identify your city, calculate accurate prayer times, and schedule Athan notifications for your area. Your location is not shared or stored outside your device.",
+          "locationWhenInUsePermission": "يستخدم أذان السليماني موقعك أثناء استخدام التطبيق لتحديد مدينتك وحساب مواقيت الصلاة وجدولة تنبيهات الأذان حسب منطقتك.",
           "locationAlwaysPermission": false,
           "locationAlwaysAndWhenInUsePermission": false,
           "isIosBackgroundLocationEnabled": false,

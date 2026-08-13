@@ -116,7 +116,7 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
     {
       icon: <Shield size={20} color={Colors.teal} />,
       title: 'خصوصيتك محفوظة',
-      subtitle: 'لا يتم مشاركة موقعك أو تخزينه خارج جهازك',
+      subtitle: 'يُستخدم الموقع لتحديد المدينة وحساب المواقيت عند اختيارك السماح',
     },
   ];
 
