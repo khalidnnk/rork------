@@ -26,8 +26,8 @@ const STORAGE_KEY = 'athan_settings_v3';
 const ATHAN_MAX_DURATION = 300;
 
 const fullAthanModule = require('@/assets/audio/athan.m4a');
-const hayaModule = require('@/assets/audio/haya-ala-salah.m4a');
-const allahuAkbarModule = require('@/assets/audio/allahu-akbar.m4a');
+const hayaModule = require('@/assets/audio/haya_ala_salah.m4a');
+const allahuAkbarModule = require('@/assets/audio/allahu_akbar.m4a');
 const FULL_ATHAN_WEB_URL = 'https://r2-pub.rork.com/attachments/z0hdqpl2rrummm8nej54s';
 const HAYA_WEB_URL = 'https://r2-pub.rork.com/attachments/hlw21fvf05k0k9b6432nz';
 const ALLAHU_AKBAR_WEB_URL = 'https://r2-pub.rork.com/attachments/er1fm5r0twtn9sod0fbrh';

@@ -156,7 +156,7 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
 
           <Text style={styles.title}>أذان السليماني</Text>
           <Text style={styles.subtitle}>
-            يحتاج التطبيق إلى موقعك لحساب{'\n'}مواقيت الصلاة بدقة في منطقتك
+            يستخدم التطبيق موقعك أثناء الاستخدام لتحديد مدينتك، حساب مواقيت الصلاة بدقة، وجدولة تنبيهات الأذان لمنطقتك
           </Text>
         </View>
 
