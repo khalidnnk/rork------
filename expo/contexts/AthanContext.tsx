@@ -17,6 +17,7 @@ import {
   getDateKey,
 } from '@/utils/prayerTimes';
 import {
+  cancelAllNotifications,
   requestNotificationPermissions,
   scheduleAllNotifications,
 } from '@/utils/notifications';
@@ -765,7 +766,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [recalculatePrayers]);
 
   useEffect(() => {
-    if (!settings.globalEnabled || Platform.OS === 'web') return;
+    if (Platform.OS === 'web') return;
+
+    if (!settings.globalEnabled) {
+      void cancelAllNotifications();
+      return;
+    }
 
     async function scheduleNotifs() {
       const granted = await requestNotificationPermissions();
