@@ -3,6 +3,9 @@ import * as Notifications from 'expo-notifications';
 import { PrayerTime, PrayerName, calculatePrayerTimes, getTimezoneOffset } from './prayerTimes';
 import { NotificationSoundType } from '@/contexts/AthanContext';
 
+let notificationSchedulingQueue: Promise<void> = Promise.resolve();
+let latestSchedulingRequest = 0;
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -149,6 +152,13 @@ export async function scheduleAthanNotification(
   console.log(`[Notifications] Sound for ${prayer.name}: ${sound} (type: ${soundType})`);
 
   try {
+    const dateKey = [
+      prayer.time.getFullYear(),
+      String(prayer.time.getMonth() + 1).padStart(2, '0'),
+      String(prayer.time.getDate()).padStart(2, '0'),
+    ].join('');
+    const identifier = `athan-${prayer.name}-${dateKey}`;
+
     const notificationContent: Notifications.NotificationContentInput = {
       title: `حان وقت صلاة ${prayer.labelAr}`,
       body: soundType === 'full_athan'
@@ -175,6 +185,7 @@ export async function scheduleAthanNotification(
     }));
 
     const id = await Notifications.scheduleNotificationAsync({
+      identifier,
       content: notificationContent,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -200,21 +211,39 @@ export async function scheduleAllNotifications(
 ): Promise<void> {
   if (Platform.OS === 'web') return;
 
-  await Notifications.cancelAllScheduledNotificationsAsync();
-  console.log('[Notifications] Cleared all existing notifications, soundType:', soundType);
-
-  let scheduledCount = 0;
-  for (const prayer of prayers) {
-    if (enabledPrayers[prayer.name]) {
-      const id = await scheduleAthanNotification(prayer, true, soundType);
-      if (id) scheduledCount++;
+  const requestId = ++latestSchedulingRequest;
+  const schedulingTask = notificationSchedulingQueue.then(async () => {
+    if (requestId !== latestSchedulingRequest) {
+      console.log('[Notifications] Skipping stale scheduling request:', requestId);
+      return;
     }
-  }
 
-  if (scheduledCount === 0) {
-    console.log('[Notifications] No future prayers today, scheduling tomorrow\'s prayers');
-    await scheduleTomorrowNotifications(latitude, longitude, offsets, enabledPrayers, soundType);
-  }
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    console.log('[Notifications] Cleared all existing notifications, soundType:', soundType);
+
+    let scheduledCount = 0;
+    for (const prayer of prayers) {
+      if (requestId !== latestSchedulingRequest) {
+        console.log('[Notifications] Scheduling request superseded:', requestId);
+        return;
+      }
+      if (enabledPrayers[prayer.name]) {
+        const id = await scheduleAthanNotification(prayer, true, soundType);
+        if (id) scheduledCount++;
+      }
+    }
+
+    if (scheduledCount === 0 && requestId === latestSchedulingRequest) {
+      console.log('[Notifications] No future prayers today, scheduling tomorrow\'s prayers');
+      await scheduleTomorrowNotifications(latitude, longitude, offsets, enabledPrayers, soundType);
+    }
+  });
+
+  notificationSchedulingQueue = schedulingTask.catch((error) => {
+    console.error('[Notifications] Scheduling queue error:', error);
+  });
+
+  await schedulingTask;
 }
 
 async function scheduleTomorrowNotifications(
@@ -246,6 +275,17 @@ async function scheduleTomorrowNotifications(
 
 export async function cancelAllNotifications(): Promise<void> {
   if (Platform.OS === 'web') return;
-  await Notifications.cancelAllScheduledNotificationsAsync();
-  console.log('[Notifications] All notifications cancelled');
+
+  const requestId = ++latestSchedulingRequest;
+  const cancellationTask = notificationSchedulingQueue.then(async () => {
+    if (requestId !== latestSchedulingRequest) return;
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    console.log('[Notifications] All notifications cancelled');
+  });
+
+  notificationSchedulingQueue = cancellationTask.catch((error) => {
+    console.error('[Notifications] Cancellation queue error:', error);
+  });
+
+  await cancellationTask;
 }
