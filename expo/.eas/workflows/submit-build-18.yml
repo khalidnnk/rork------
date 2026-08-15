@@ -1,0 +1,8 @@
+name: Submit iOS build 18
+
+jobs:
+  submit_ios:
+    type: submit
+    params:
+      build_id: 4fe18ed1-a5b5-42df-b28e-652dbf1db220
+      profile: production
