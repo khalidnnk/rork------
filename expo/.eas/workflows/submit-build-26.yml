@@ -1,0 +1,8 @@
+name: Submit iOS build 26
+
+jobs:
+  submit_ios:
+    type: submit
+    params:
+      build_id: 73c495a7-c8f0-4cad-b8ae-54dd999caf8e
+      profile: production
