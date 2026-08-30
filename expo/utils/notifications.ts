@@ -6,6 +6,7 @@ import type { NotificationSoundType } from '@/contexts/AthanContext';
 let notificationSchedulingQueue: Promise<void> = Promise.resolve();
 let latestSchedulingRequest = 0;
 const NOTIFICATION_SCHEDULE_DAYS = 12;
+const RENEWAL_REMINDER_DAYS = 10;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -202,6 +203,34 @@ export async function scheduleAthanNotification(
   }
 }
 
+async function scheduleRenewalReminder(fromDate: Date): Promise<void> {
+  const reminderDate = new Date(fromDate);
+  reminderDate.setDate(reminderDate.getDate() + RENEWAL_REMINDER_DAYS);
+  reminderDate.setHours(19, 0, 0, 0);
+
+  const secondsUntil = Math.max(
+    1,
+    Math.floor((reminderDate.getTime() - Date.now()) / 1000)
+  );
+  const reason = Platform.OS === 'ios'
+    ? 'السبب: نظام iPhone يحد عدد التنبيهات التي يمكن جدولتها مسبقًا، وفتح التطبيق يجددها تلقائيًا.'
+    : 'السبب: فتح التطبيق يجدد جدول تنبيهات الأذان تلقائيًا.';
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'athan-renewal-reminder',
+    content: {
+      title: 'تجديد تنبيهات الأذان 🤍',
+      body: `افتح التطبيق لتجديد التنبيهات للأيام القادمة.\n${reason}`,
+      sound: 'default',
+      data: { type: 'renewal-reminder' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: secondsUntil,
+    },
+  });
+}
+
 export async function scheduleAllNotifications(
   prayers: PrayerTime[],
   enabledPrayers: Record<PrayerName, boolean>,
@@ -243,7 +272,10 @@ export async function scheduleAllNotifications(
       }
     }
 
-    console.log(`[Notifications] Scheduled ${scheduledCount} Athan alerts across ${NOTIFICATION_SCHEDULE_DAYS} days`);
+    if (requestId !== latestSchedulingRequest) return;
+    await scheduleRenewalReminder(today);
+
+    console.log(`[Notifications] Scheduled ${scheduledCount} Athan alerts across ${NOTIFICATION_SCHEDULE_DAYS} days plus renewal reminder`);
   });
 
   notificationSchedulingQueue = schedulingTask.catch((error) => {

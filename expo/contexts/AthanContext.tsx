@@ -469,10 +469,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   useEffect(() => {
     if (settingsQuery.data) {
       setSettings(settingsQuery.data);
-      if (!hasAutoDetected.current) {
-        hasAutoDetected.current = true;
-        console.log('[AthanContext] Settings loaded, skipping auto-detect (handled by onboarding)');
-      }
     }
   }, [settingsQuery.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -540,7 +536,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     [updateSettings]
   );
 
-  const _detectAutoLocationSilent = useCallback(async () => {
+  const detectAutoLocationSilent = useCallback(async () => {
     try {
       if (Platform.OS === 'web') {
         if ('geolocation' in navigator) {
@@ -566,7 +562,9 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         return;
       }
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // Never show a permission prompt silently. Onboarding/settings own the
+      // prompt; automatic refresh only uses a permission already granted.
+      const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') {
         console.log('[AthanContext] Location permission denied on startup');
         return;
@@ -580,16 +578,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       const lng = loc.coords.longitude;
       const tz = getTimezoneOffset();
 
-      let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
-      try {
-        const addresses = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-        if (addresses.length > 0) {
-          const addr = addresses[0];
-          locationName = [addr.city, addr.country].filter(Boolean).join(', ');
-        }
-      } catch (e) {
-        console.log('[AthanContext] Reverse geocode failed:', e);
-      }
+      const locationName = await resolveLocationName(lat, lng);
 
       updateSettings({
         latitude: lat,
@@ -602,6 +591,18 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.error('[AthanContext] Silent location error:', e);
     }
   }, [updateSettings]);
+
+  // Automatic is the default mode. It remains active across launches until
+  // the user explicitly chooses a city, which switches locationMode to manual.
+  useEffect(() => {
+    const loadedSettings = settingsQuery.data;
+    if (!loadedSettings || hasAutoDetected.current) return;
+
+    hasAutoDetected.current = true;
+    if (loadedSettings.locationMode === 'auto') {
+      void detectAutoLocationSilent();
+    }
+  }, [detectAutoLocationSilent, settingsQuery.data]);
 
   const detectAutoLocation = useCallback(async () => {
     setLocationLoading(true);
@@ -783,12 +784,21 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         console.log('[AthanContext] App became active, refreshing prayer times');
         void loadSettings().then((storedSettings) => {
           setSettings(storedSettings);
+          setDailyPrayers(calculatePrayerTimes(
+            new Date(),
+            storedSettings.latitude,
+            storedSettings.longitude,
+            getTimezoneOffset(),
+            storedSettings.offsets
+          ));
+          if (storedSettings.locationMode === 'auto') {
+            void detectAutoLocationSilent();
+          }
         });
-        recalculatePrayers();
       }
     });
     return () => subscription.remove();
-  }, [recalculatePrayers]);
+  }, [detectAutoLocationSilent]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;

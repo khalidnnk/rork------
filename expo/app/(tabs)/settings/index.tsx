@@ -685,6 +685,7 @@ export default function SettingsScreen() {
                 <Calculator size={18} color={Colors.accent} />
                 <View style={styles.cardRowTextWrap}>
                   <Text style={styles.cardRowTitle}>تقويم أم القرى (مكة)</Text>
+                  <Text style={styles.cardRowSubtitle}>تُحسب المواقيت داخل الجهاز وتعمل دون إنترنت</Text>
                 </View>
               </View>
               <View style={styles.lockedLabel}>

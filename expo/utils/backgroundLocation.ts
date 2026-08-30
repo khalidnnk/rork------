@@ -6,6 +6,7 @@ import type { AthanSettings } from '@/contexts/AthanContext';
 import { calculatePrayerTimes, getTimezoneOffset } from '@/utils/prayerTimes';
 import { scheduleAllNotifications, showLocationUpdatedNotification } from '@/utils/notifications';
 import { publishWidgetData } from '@/utils/widgetData';
+import { ALL_CITIES } from '@/constants/cities';
 
 export const BACKGROUND_LOCATION_TASK = 'athan-significant-location-change';
 export const ATHAN_SETTINGS_STORAGE_KEY = 'athan_settings_v3';
@@ -46,7 +47,22 @@ export async function resolveLocationName(latitude: number, longitude: number): 
   } catch (error) {
     console.log('[BackgroundLocation] Reverse geocode failed:', error);
   }
-  return 'المنطقة الجديدة';
+
+  // Reverse geocoding can require a network connection. Fall back to the
+  // bundled city list so travel updates still have a useful Arabic name when
+  // the device is offline.
+  const nearestCity = ALL_CITIES.reduce<{ name: string; distance: number } | null>((nearest, city) => {
+    const distance = distanceInMeters(latitude, longitude, city.latitude, city.longitude);
+    if (!nearest || distance < nearest.distance) {
+      return { name: city.nameAr, distance };
+    }
+    return nearest;
+  }, null);
+
+  // Avoid naming a distant city when the user is outside the bundled coverage.
+  return nearestCity && nearestCity.distance <= 150_000
+    ? nearestCity.name
+    : 'موقعك الحالي';
 }
 
 TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
