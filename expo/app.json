@@ -3,7 +3,7 @@
     "name": "Alsulaimani Athan",
     "slug": "alsulaimani-athan",
     "owner": "khalidnn",
-    "version": "1.3.3",
+    "version": "1.3.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "alsulaimani-athan",
@@ -17,11 +17,22 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.rork.alsulaimani-athan",
+      "buildNumber": "19",
+      "appleTeamId": "4FX7S5KVYY",
       "config": {
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "يستخدم أذان السليماني موقعك أثناء استخدام التطبيق لتحديد مدينتك وحساب مواقيت الصلاة وجدولة تنبيهات الأذان حسب منطقتك."
+        "NSLocationWhenInUseUsageDescription": "يستخدم أذان السليماني موقعك أثناء استخدام التطبيق لتحديد مدينتك وحساب مواقيت الصلاة وجدولة تنبيهات الأذان حسب منطقتك.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "يستخدم أذان السليماني موقعك في الخلفية عند سفرك إلى منطقة أخرى لتحديث مواقيت الصلاة وجدولة تنبيهات الأذان الصحيحة تلقائيًا، حتى دون فتح التطبيق. لا يتم حفظ سجل تحركاتك أو مشاركة موقعك.",
+        "UIBackgroundModes": [
+          "location"
+        ]
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.app.alsulaimani.athan"
+        ]
       }
     },
     "android": {
@@ -30,10 +41,13 @@
         "backgroundColor": "#0B1A1F"
       },
       "package": "app.rork.alsulaimani_athan",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
         "POST_NOTIFICATIONS"
       ],
       "blockedPermissions": [
@@ -58,12 +72,13 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "يستخدم أذان السليماني موقعك أثناء استخدام التطبيق لتحديد مدينتك وحساب مواقيت الصلاة وجدولة تنبيهات الأذان حسب منطقتك.",
-          "locationAlwaysPermission": false,
-          "locationAlwaysAndWhenInUsePermission": false,
-          "isIosBackgroundLocationEnabled": false,
-          "isAndroidBackgroundLocationEnabled": false
+          "locationAlwaysPermission": "يستخدم أذان السليماني موقعك في الخلفية عند سفرك إلى منطقة أخرى لتحديث مواقيت الصلاة وتنبيهات الأذان تلقائيًا.",
+          "locationAlwaysAndWhenInUsePermission": "يستخدم أذان السليماني موقعك في الخلفية عند سفرك إلى منطقة أخرى لتحديث مواقيت الصلاة وجدولة تنبيهات الأذان الصحيحة تلقائيًا، حتى دون فتح التطبيق. لا يتم حفظ سجل تحركاتك أو مشاركة موقعك.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ],
+      "@bacons/apple-targets",
       [
         "expo-notifications",
         {

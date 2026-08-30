@@ -20,11 +20,15 @@ Welcome to Alsulaimani Athan. We respect your privacy and are committed to prote
 - يستخدم التطبيق موقعك الجغرافي (GPS) **فقط** لحساب مواقيت الصلاة الدقيقة لمنطقتك.
 - **لا يتم إرسال** بيانات موقعك إلى أي خادم خارجي.
 - تُعالج بيانات الموقع **محلياً على جهازك فقط**.
+- إذا فعّلت خيار **التحديث أثناء السفر**، يستخدم التطبيق الموقع في الخلفية فقط عند الانتقال لمسافة ملحوظة لتحديث مواقيت الصلاة والتنبيهات تلقائياً.
+- لا يحتفظ التطبيق بسجل لتحركاتك أو الأماكن التي زرتها.
 - يمكنك اختيار مدينتك يدوياً بدلاً من استخدام GPS.
 
 - The app uses your geographic location (GPS) **only** to calculate accurate prayer times for your area.
 - Your location data is **never sent** to any external server.
 - Location data is processed **locally on your device only**.
+- If you enable **Update While Traveling**, the app uses background location only after a significant move to update prayer times and local notifications automatically.
+- The app does not keep a history of your movements or visited places.
 - You can manually select your city instead of using GPS.
 
 ### الإشعارات | Notifications

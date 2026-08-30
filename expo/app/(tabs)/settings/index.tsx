@@ -9,6 +9,8 @@ import {
   Animated,
   Modal,
   useWindowDimensions,
+  Alert,
+  GestureResponderEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,6 +29,7 @@ import {
   Moon,
   Sun,
   Calculator,
+  Route,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -36,6 +39,7 @@ import { PrayerName } from '@/utils/prayerTimes';
 import CityPickerModal from '@/components/CityPickerModal';
 import { City } from '@/constants/cities';
 import { List } from 'lucide-react-native';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 const SOUND_OPTIONS: { key: NotificationSoundType; label: string; description: string }[] = [
   { key: 'full_athan', label: 'الأذان كاملاً', description: '٣٠ ثانية في التنبيه ويكمل داخل التطبيق' },
@@ -48,6 +52,7 @@ const SOUND_OPTIONS: { key: NotificationSoundType; label: string; description: s
 const OFFSET_OPTIONS = [0, 2, 5];
 
 function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean; onStop: () => void; playerStatus: { currentTime: number; duration: number; playing: boolean } }) {
+  const reduceMotion = useReducedMotion();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const waveAnim1 = useRef(new Animated.Value(1)).current;
@@ -58,6 +63,11 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
 
   useEffect(() => {
     if (visible) {
+      if (reduceMotion) {
+        fadeAnim.setValue(1);
+        scaleAnim.setValue(1);
+        return;
+      }
       fadeAnim.setValue(0);
       scaleAnim.setValue(0.9);
       Animated.parallel([
@@ -107,17 +117,21 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
         rotate.stop();
       };
     }
-  }, [visible, fadeAnim, scaleAnim, waveAnim1, waveAnim2, waveAnim3, glowAnim, rotateAnim]);
+  }, [visible, fadeAnim, scaleAnim, waveAnim1, waveAnim2, waveAnim3, glowAnim, rotateAnim, reduceMotion]);
 
   const handleStop = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    if (reduceMotion) {
+      onStop();
+      return;
+    }
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 0.9, duration: 200, useNativeDriver: true }),
     ]).start(() => {
       onStop();
     });
-  }, [onStop, fadeAnim, scaleAnim]);
+  }, [onStop, fadeAnim, scaleAnim, reduceMotion]);
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -135,7 +149,7 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
   };
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal>
       <Animated.View style={[athanStyles.overlay, { opacity: fadeAnim }]}>
         <LinearGradient
           colors={['#0B1A1F', '#091418', '#060E12']}
@@ -179,6 +193,8 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
             onPress={handleStop}
             activeOpacity={0.8}
             testID="stop-athan-modal"
+            accessibilityRole="button"
+            accessibilityLabel="إيقاف الأذان"
           >
             <LinearGradient
               colors={['#E74C3C', '#C0392B']}
@@ -219,6 +235,7 @@ export default function SettingsScreen() {
     stopAthan,
     playerStatus,
     detectAutoLocation,
+    setBackgroundLocationEnabled,
     locationLoading,
     updateSettings,
     isPreviewPlaying,
@@ -263,6 +280,25 @@ export default function SettingsScreen() {
     void detectAutoLocation();
   }, [detectAutoLocation]);
 
+  const handleBackgroundLocationToggle = useCallback(async (enabled: boolean) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const granted = await setBackgroundLocationEnabled(enabled);
+      if (enabled && granted) {
+        await detectAutoLocation();
+      }
+      if (enabled && !granted) {
+        Alert.alert(
+          'يلزم السماح بالموقع دائمًا',
+          'لتحديث مواقيت الصلاة عند السفر دون فتح التطبيق، اختر السماح بالموقع دائمًا من إعدادات الجهاز.'
+        );
+      }
+    } catch (error) {
+      console.error('[Settings] Background location toggle failed:', error);
+      Alert.alert('تعذر تفعيل التحديث التلقائي', 'تأكد من صلاحية الموقع ثم حاول مرة أخرى.');
+    }
+  }, [detectAutoLocation, setBackgroundLocationEnabled]);
+
   const handleSoundChange = useCallback(
     (sound: NotificationSoundType) => {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -279,10 +315,16 @@ export default function SettingsScreen() {
     [previewSound]
   );
 
+  const handlePreviewSoundPress = useCallback((event: GestureResponderEvent, sound: NotificationSoundType) => {
+    event.stopPropagation();
+    handlePreviewSound(sound);
+  }, [handlePreviewSound]);
+
   const [cityPickerVisible, setCityPickerVisible] = useState<boolean>(false);
 
   const handleSelectCity = useCallback((city: City) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void setBackgroundLocationEnabled(false);
     updateSettings({
       latitude: city.latitude,
       longitude: city.longitude,
@@ -291,7 +333,7 @@ export default function SettingsScreen() {
       locationMode: 'manual',
     });
     setCityPickerVisible(false);
-  }, [updateSettings]);
+  }, [setBackgroundLocationEnabled, updateSettings]);
 
   const handleOpenCityPicker = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -358,6 +400,7 @@ export default function SettingsScreen() {
                 trackColor={{ false: Colors.surface, true: Colors.accent }}
                 thumbColor={Colors.white}
                 testID="global-switch"
+                accessibilityLabel="تفعيل جميع تنبيهات الأذان"
               />
             </View>
           </View>
@@ -372,6 +415,8 @@ export default function SettingsScreen() {
                 onPress={handlePlayAthan}
                 activeOpacity={0.7}
                 testID="play-stop-athan"
+                accessibilityRole="button"
+                accessibilityLabel="تشغيل الأذان كاملاً"
               >
                 <LinearGradient
                   colors={[Colors.accent, '#B8922E']}
@@ -403,6 +448,9 @@ export default function SettingsScreen() {
                     onPress={() => handleSoundChange(option.key)}
                     activeOpacity={0.7}
                     testID={`sound-${option.key}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isActive }}
+                    accessibilityLabel={`${option.label}، ${option.description}`}
                   >
                     <View style={styles.soundOptionLeft}>
                       <View style={[styles.radioOuter, isActive && styles.radioOuterActive]}>
@@ -420,9 +468,11 @@ export default function SettingsScreen() {
                             styles.previewButton,
                             isPreviewPlaying && previewingSoundType === option.key && styles.previewButtonActive,
                           ]}
-                          onPress={() => handlePreviewSound(option.key)}
+                          onPress={(event) => handlePreviewSoundPress(event, option.key)}
                           activeOpacity={0.6}
                           testID={`preview-${option.key}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`معاينة صوت ${option.label}`}
                         >
                           {isPreviewPlaying && previewingSoundType === option.key ? (
                             <Square size={13} color={Colors.accent} fill={Colors.accent} />
@@ -468,6 +518,7 @@ export default function SettingsScreen() {
                     trackColor={{ false: Colors.surface, true: Colors.accent }}
                     thumbColor={Colors.white}
                     testID={`toggle-${name}`}
+                    accessibilityLabel={`تفعيل تنبيه صلاة ${PRAYER_LABELS_AR[name]}`}
                   />
                 </View>
               </View>
@@ -498,6 +549,9 @@ export default function SettingsScreen() {
                           ]}
                           onPress={() => handleSetOffset(name, opt)}
                           activeOpacity={0.7}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isActive }}
+                          accessibilityLabel={`${PRAYER_LABELS_AR[name]}، ${opt === 0 ? 'بدون تأخير' : `تأخير ${opt} دقائق`}`}
                         >
                           <Text
                             style={[
@@ -536,6 +590,28 @@ export default function SettingsScreen() {
 
             <View style={styles.cardRow}>
               <View style={styles.cardRowLeft}>
+                <Route size={18} color={settings.backgroundLocationEnabled ? Colors.accent : Colors.textSecondary} />
+                <View style={styles.cardRowTextWrap}>
+                  <Text style={styles.cardRowTitle}>التحديث أثناء السفر</Text>
+                  <Text style={styles.cardRowSubtitle}>
+                    يحدّث الموقع والمواقيت تلقائيًا عند الانتقال لمسافة ملحوظة
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={settings.backgroundLocationEnabled}
+                onValueChange={(enabled) => void handleBackgroundLocationToggle(enabled)}
+                trackColor={{ false: Colors.surface, true: Colors.accent }}
+                thumbColor={Colors.white}
+                testID="background-location-switch"
+                accessibilityLabel="تحديث الموقع ومواقيت الصلاة تلقائيًا أثناء السفر"
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.cardRow}>
+              <View style={styles.cardRowLeft}>
                 <Compass size={18} color={Colors.textSecondary} />
                 <View style={styles.cardRowTextWrap}>
                   <Text style={styles.cardRowTitle}>الإحداثيات</Text>
@@ -568,6 +644,8 @@ export default function SettingsScreen() {
                 onPress={handleRefreshLocation}
                 activeOpacity={0.7}
                 testID="refresh-location"
+                accessibilityRole="button"
+                accessibilityLabel="تحديث الموقع الحالي باستخدام GPS"
               >
                 <Navigation size={15} color={Colors.teal} />
                 <Text style={styles.locationActionTextTeal}>
@@ -582,6 +660,8 @@ export default function SettingsScreen() {
                 onPress={handleOpenCityPicker}
                 activeOpacity={0.7}
                 testID="open-city-picker"
+                accessibilityRole="button"
+                accessibilityLabel="اختيار المدينة يدويًا"
               >
                 <List size={15} color={Colors.accent} />
                 <Text style={styles.locationActionTextAccent}>اختيار المدينة يدوياً</Text>
@@ -686,17 +766,17 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionLabel: {
-    fontSize: 12,
-    fontFamily: 'Dubai-Medium',
-    color: Colors.textMuted,
+    fontSize: 14,
+    fontFamily: 'Dubai-Bold',
+    color: Colors.textMutedReadable,
     marginBottom: 8,
     marginLeft: 4,
     writingDirection: 'rtl',
     textAlign: 'right',
   },
   sectionDescription: {
-    fontSize: 12,
-    fontFamily: 'Dubai-Regular',
+    fontSize: 14,
+    fontFamily: 'Dubai-Medium',
     color: Colors.textSecondary,
     marginBottom: 8,
     marginRight: 4,
@@ -732,8 +812,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   cardRowSubtitle: {
-    fontSize: 12,
-    fontFamily: 'Dubai-Regular',
+    fontSize: 14,
+    fontFamily: 'Dubai-Medium',
     color: Colors.textSecondary,
     marginTop: 1,
   },
@@ -787,9 +867,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   progressTime: {
-    fontSize: 11,
-    fontFamily: 'Dubai-Regular',
-    color: Colors.textMuted,
+    fontSize: 12,
+    fontFamily: 'Dubai-Medium',
+    color: Colors.textMutedReadable,
     fontVariant: ['tabular-nums'] as const,
   },
   prayerToggleRow: {
@@ -827,7 +907,11 @@ const styles = StyleSheet.create({
   },
   offsetChip: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 10,
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 8,
     backgroundColor: Colors.surface,
     borderWidth: 1,
@@ -838,7 +922,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(201,168,76,0.3)',
   },
   offsetChipText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Dubai-Medium',
     color: Colors.textSecondary,
   },
@@ -930,7 +1014,7 @@ const styles = StyleSheet.create({
   lockedLabelText: {
     fontSize: 11,
     fontFamily: 'Dubai-Medium',
-    color: Colors.textMuted,
+    color: Colors.textMutedReadable,
   },
   dedicationCard: {
     alignItems: 'center',
@@ -993,9 +1077,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   previewButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1121,8 +1205,8 @@ const athanStyles = StyleSheet.create({
   },
   timeText: {
     fontSize: 12,
-    fontFamily: 'Dubai-Regular',
-    color: Colors.textMuted,
+    fontFamily: 'Dubai-Medium',
+    color: Colors.textMutedReadable,
     fontVariant: ['tabular-nums'] as const,
   },
   stopButton: {

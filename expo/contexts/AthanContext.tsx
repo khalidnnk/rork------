@@ -21,9 +21,16 @@ import {
   requestNotificationPermissions,
   scheduleAllNotifications,
 } from '@/utils/notifications';
+import {
+  ATHAN_SETTINGS_STORAGE_KEY,
+  resolveLocationName,
+  startBackgroundLocationUpdates,
+  stopBackgroundLocationUpdates,
+} from '@/utils/backgroundLocation';
+import { publishWidgetData } from '@/utils/widgetData';
 
 
-const STORAGE_KEY = 'athan_settings_v3';
+const STORAGE_KEY = ATHAN_SETTINGS_STORAGE_KEY;
 const ATHAN_MAX_DURATION = 300;
 
 const fullAthanModule = require('@/assets/audio/athan.m4a');
@@ -42,6 +49,7 @@ export interface AthanSettings {
   longitude: number;
   timezone: number;
   locationMode: 'auto' | 'manual';
+  backgroundLocationEnabled: boolean;
   hasSeenWelcome: boolean;
   notificationSound: NotificationSoundType;
 }
@@ -67,6 +75,7 @@ const DEFAULT_SETTINGS: AthanSettings = {
   longitude: 46.6753,
   timezone: 3,
   locationMode: 'auto' as const,
+  backgroundLocationEnabled: false,
   hasSeenWelcome: false,
   notificationSound: 'athan' as const,
 };
@@ -103,7 +112,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const [previewingSoundType, setPreviewingSoundType] = useState<NotificationSoundType | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [resolvedFullAthan, setResolvedFullAthan] = useState<{ uri: string } | null>(null);
   const [resolvedHaya, setResolvedHaya] = useState<{ uri: string } | null>(null);
@@ -640,16 +648,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       const lng = loc.coords.longitude;
       const tz = getTimezoneOffset();
 
-      let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
-      try {
-        const addresses = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-        if (addresses.length > 0) {
-          const addr = addresses[0];
-          locationName = [addr.city, addr.country].filter(Boolean).join(', ');
-        }
-      } catch (e) {
-        console.log('[AthanContext] Reverse geocode failed:', e);
-      }
+      const locationName = await resolveLocationName(lat, lng);
 
       updateSettings({
         latitude: lat,
@@ -664,6 +663,46 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       setLocationLoading(false);
     }
   }, [updateSettings]);
+
+  const setBackgroundLocationEnabled = useCallback(async (enabled: boolean): Promise<boolean> => {
+    if (Platform.OS === 'web') return false;
+
+    if (!enabled) {
+      await stopBackgroundLocationUpdates();
+      updateSettings({ backgroundLocationEnabled: false });
+      return true;
+    }
+
+    const foreground = await Location.requestForegroundPermissionsAsync();
+    if (foreground.status !== 'granted') {
+      updateSettings({ backgroundLocationEnabled: false });
+      return false;
+    }
+
+    const background = await Location.requestBackgroundPermissionsAsync();
+    if (background.status !== 'granted') {
+      updateSettings({ backgroundLocationEnabled: false });
+      return false;
+    }
+
+    await startBackgroundLocationUpdates();
+    updateSettings({ backgroundLocationEnabled: true, locationMode: 'auto' });
+    return true;
+  }, [updateSettings]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || settingsQuery.isLoading) return;
+    if (!settings.backgroundLocationEnabled) return;
+
+    void Location.getBackgroundPermissionsAsync().then((permission) => {
+      if (permission.status === 'granted') {
+        return startBackgroundLocationUpdates();
+      }
+      updateSettings({ backgroundLocationEnabled: false });
+    }).catch((error) => {
+      console.error('[AthanContext] Background location restore failed:', error);
+    });
+  }, [settings.backgroundLocationEnabled, settingsQuery.isLoading, updateSettings]);
 
   const [dateKey, setDateKey] = useState<string>(getDateKey());
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayers>(() => {
@@ -698,6 +737,10 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   useEffect(() => {
     recalculatePrayers();
   }, [recalculatePrayers, dateKey]);
+
+  useEffect(() => {
+    publishWidgetData(settings);
+  }, [settings]);
 
   useEffect(() => {
     const updateNextPrayer = () => {
@@ -735,22 +778,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [dailyPrayers, settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
 
   useEffect(() => {
-    refreshTimerRef.current = setInterval(() => {
-      console.log('[AthanContext] Auto-refresh prayer times');
-      recalculatePrayers();
-    }, 60000);
-
-    return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
-    };
-  }, [recalculatePrayers]);
-
-  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         console.log('[AthanContext] App became active, refreshing prayer times');
+        void loadSettings().then((storedSettings) => {
+          setSettings(storedSettings);
+        });
         recalculatePrayers();
       }
     });
@@ -784,6 +817,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     dismissWelcome,
     setLocation,
     detectAutoLocation,
+    setBackgroundLocationEnabled,
     dailyPrayers,
     nextPrayer,
     locationLoading,
@@ -808,6 +842,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     dismissWelcome,
     setLocation,
     detectAutoLocation,
+    setBackgroundLocationEnabled,
     dailyPrayers,
     nextPrayer,
     locationLoading,

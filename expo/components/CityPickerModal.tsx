@@ -73,6 +73,9 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
         onPress={() => handleSelect(item)}
         activeOpacity={0.6}
         testID={`city-${item.name}`}
+        accessibilityRole="button"
+        accessibilityState={{ selected: isSelected }}
+        accessibilityLabel={`اختيار مدينة ${item.nameAr}`}
       >
         <View style={modalStyles.cityInfo}>
           <Text style={[modalStyles.cityName, isSelected && modalStyles.cityNameSelected]}>
@@ -99,7 +102,7 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
   const keyExtractor = useCallback((item: City, index: number) => `${item.country}-${item.name}-${index}`, []);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent accessibilityViewIsModal>
       <View style={[modalStyles.overlay, { paddingTop: insets.top }]}>
         <View style={[modalStyles.container, { maxHeight: height * 0.88, paddingBottom: insets.bottom + 12 }]}>
           <View style={modalStyles.header}>
@@ -112,6 +115,8 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
               onPress={handleClose}
               activeOpacity={0.7}
               testID="close-city-picker"
+              accessibilityRole="button"
+              accessibilityLabel="إغلاق اختيار المدينة"
             >
               <X size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -127,9 +132,15 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
               onChangeText={setSearch}
               autoCorrect={false}
               testID="city-search-input"
+              accessibilityLabel="البحث عن مدينة أو دولة"
             />
             {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')} style={modalStyles.clearButton}>
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                style={modalStyles.clearButton}
+                accessibilityRole="button"
+                accessibilityLabel="مسح البحث"
+              >
                 <X size={14} color={Colors.textMuted} />
               </TouchableOpacity>
             )}
@@ -189,9 +200,9 @@ const modalStyles = StyleSheet.create({
     color: Colors.text,
   },
   closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -220,7 +231,10 @@ const modalStyles = StyleSheet.create({
     writingDirection: 'rtl',
   },
   clearButton: {
-    padding: 4,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginLeft: 4,
   },
   listContent: {
@@ -272,8 +286,8 @@ const modalStyles = StyleSheet.create({
   },
   cityNameEn: {
     fontSize: 12,
-    fontFamily: 'Dubai-Regular',
-    color: Colors.textMuted,
+    fontFamily: 'Dubai-Medium',
+    color: Colors.textMutedReadable,
   },
   checkWrap: {
     width: 28,
@@ -292,6 +306,6 @@ const modalStyles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontFamily: 'Dubai-Medium',
-    color: Colors.textMuted,
+    color: Colors.textMutedReadable,
   },
 });

@@ -29,6 +29,7 @@ import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAthan } from '@/contexts/AthanContext';
 import { getTimeUntil, PrayerName } from '@/utils/prayerTimes';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 const PRAYER_ICONS: Record<PrayerName, React.ComponentType<{ size: number; color: string }>> = {
   fajr: Sunrise,
@@ -39,11 +40,17 @@ const PRAYER_ICONS: Record<PrayerName, React.ComponentType<{ size: number; color
 };
 
 function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const reduceMotion = useReducedMotion();
   const aboutFadeAnim = useRef(new Animated.Value(0)).current;
   const aboutScaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
     if (visible) {
+      if (reduceMotion) {
+        aboutFadeAnim.setValue(1);
+        aboutScaleAnim.setValue(1);
+        return;
+      }
       aboutFadeAnim.setValue(0);
       aboutScaleAnim.setValue(0.9);
       Animated.parallel([
@@ -60,9 +67,13 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, reduceMotion, aboutFadeAnim, aboutScaleAnim]);
 
   const handleDismiss = useCallback(() => {
+    if (reduceMotion) {
+      onDismiss();
+      return;
+    }
     Animated.parallel([
       Animated.timing(aboutFadeAnim, {
         toValue: 0,
@@ -77,10 +88,10 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
     ]).start(() => {
       onDismiss();
     });
-  }, [onDismiss, aboutFadeAnim, aboutScaleAnim]);
+  }, [onDismiss, aboutFadeAnim, aboutScaleAnim, reduceMotion]);
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal>
       <Animated.View style={[styles.welcomeOverlay, { opacity: aboutFadeAnim }]}>
         <Animated.View style={[styles.welcomeCard, { transform: [{ scale: aboutScaleAnim }] }]}>
           <LinearGradient
@@ -107,12 +118,15 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
               source={require('@/assets/images/icon.png')}
               style={styles.welcomeAppIcon}
               contentFit="cover"
+              accessibilityLabel="صورة عبدالرحمن السليماني"
             />
 
             <TouchableOpacity
               style={styles.welcomeButton}
               onPress={handleDismiss}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="إغلاق نافذة عن التطبيق"
             >
               <LinearGradient
                 colors={[Colors.accent, '#B8922E']}
@@ -131,11 +145,17 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
 }
 
 function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const reduceMotion = useReducedMotion();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
     if (visible) {
+      if (reduceMotion) {
+        fadeAnim.setValue(1);
+        scaleAnim.setValue(1);
+        return;
+      }
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -150,9 +170,13 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, reduceMotion, fadeAnim, scaleAnim]);
 
   const handleDismiss = useCallback(() => {
+    if (reduceMotion) {
+      onDismiss();
+      return;
+    }
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -167,10 +191,10 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
     ]).start(() => {
       onDismiss();
     });
-  }, [onDismiss, fadeAnim, scaleAnim]);
+  }, [onDismiss, fadeAnim, scaleAnim, reduceMotion]);
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent accessibilityViewIsModal>
       <Animated.View style={[styles.welcomeOverlay, { opacity: fadeAnim }]}>
         <Animated.View style={[styles.welcomeCard, { transform: [{ scale: scaleAnim }] }]}>
           <LinearGradient
@@ -194,12 +218,15 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
               source={require('@/assets/images/icon.png')}
               style={styles.welcomeAppIcon}
               contentFit="cover"
+              accessibilityLabel="صورة عبدالرحمن السليماني"
             />
 
             <TouchableOpacity
               style={styles.welcomeButton}
               onPress={handleDismiss}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="بدء استخدام التطبيق"
             >
               <LinearGradient
                 colors={[Colors.accent, '#B8922E']}
@@ -221,6 +248,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const reduceMotion = useReducedMotion();
   const {
     settings,
     dailyPrayers,
@@ -243,6 +271,13 @@ export default function HomeScreen() {
   const countdownScale = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
+    if (reduceMotion) {
+      fadeAnim.setValue(1);
+      countdownScale.setValue(1);
+      slideAnims.forEach((anim) => anim.setValue(0));
+      opacityAnims.forEach((anim) => anim.setValue(1));
+      return;
+    }
     if (!settings.hasSeenWelcome) {
       const timer = setTimeout(() => setShowWelcome(true), 600);
       return () => clearTimeout(timer);
@@ -280,7 +315,7 @@ export default function HomeScreen() {
         }),
       ]).start();
     });
-  }, []);
+  }, [reduceMotion, fadeAnim, countdownScale, slideAnims, opacityAnims, dailyPrayers.prayers]);
 
   useEffect(() => {
     const updateCountdown = () => {
@@ -352,7 +387,9 @@ export default function HomeScreen() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setShowAbout(true);
                 }}
-                activeOpacity={0.7}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="عن التطبيق"
                 testID="about-button"
               >
                 <Info size={18} color={Colors.textSecondary} />
@@ -433,7 +470,7 @@ export default function HomeScreen() {
                   isNext && styles.prayerCardActive,
                   isPast && styles.prayerCardPast,
                   {
-                    opacity: opacityAnims[index],
+                    opacity: Animated.multiply(opacityAnims[index], isPast ? 0.55 : 1),
                     transform: [{ translateY: slideAnims[index] }],
                   },
                 ]}
@@ -560,13 +597,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   locationText: {
-    fontSize: 13,
-    fontFamily: 'Dubai-Regular',
+    fontSize: 14,
+    fontFamily: 'Dubai-Medium',
     color: '#FFFFFF',
   },
   dateText: {
-    fontSize: 13,
-    fontFamily: 'Dubai-Regular',
+    fontSize: 14,
+    fontFamily: 'Dubai-Medium',
     color: '#FFFFFF',
     writingDirection: 'rtl',
   },
@@ -588,8 +625,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   countdownLabel: {
-    fontSize: 12,
-    fontFamily: 'Dubai-Medium',
+    fontSize: 14,
+    fontFamily: 'Dubai-Bold',
     color: Colors.accent,
     letterSpacing: 0.5,
   },
@@ -630,8 +667,8 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   timerUnit: {
-    fontSize: 10,
-    fontFamily: 'Dubai-Regular',
+    fontSize: 12,
+    fontFamily: 'Dubai-Medium',
     color: 'rgba(255,255,255,0.75)',
     marginTop: 4,
   },
@@ -660,8 +697,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   sectionSubtitle: {
-    fontSize: 11,
-    fontFamily: 'Dubai-Regular',
+    fontSize: 13,
+    fontFamily: 'Dubai-Medium',
     color: 'rgba(255,255,255,0.7)',
   },
   prayerList: {
@@ -683,9 +720,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(201,168,76,0.3)',
     backgroundColor: 'rgba(201,168,76,0.06)',
   },
-  prayerCardPast: {
-    opacity: 0.45,
-  },
+  prayerCardPast: {},
   prayerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -727,10 +762,10 @@ const styles = StyleSheet.create({
     color: Colors.accentLight,
   },
   prayerNamePast: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.82)',
   },
   offsetBadge: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: 'Dubai-Medium',
     color: Colors.accent,
   },
@@ -748,7 +783,7 @@ const styles = StyleSheet.create({
     color: Colors.accent,
   },
   prayerTimePast: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.82)',
   },
   welcomeOverlay: {
     flex: 1,

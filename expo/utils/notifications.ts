@@ -1,10 +1,11 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { PrayerTime, PrayerName, calculatePrayerTimes, getTimezoneOffset } from './prayerTimes';
-import { NotificationSoundType } from '@/contexts/AthanContext';
+import type { NotificationSoundType } from '@/contexts/AthanContext';
 
 let notificationSchedulingQueue: Promise<void> = Promise.resolve();
 let latestSchedulingRequest = 0;
+const NOTIFICATION_SCHEDULE_DAYS = 12;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -222,21 +223,27 @@ export async function scheduleAllNotifications(
     console.log('[Notifications] Cleared all existing notifications, soundType:', soundType);
 
     let scheduledCount = 0;
-    for (const prayer of prayers) {
-      if (requestId !== latestSchedulingRequest) {
-        console.log('[Notifications] Scheduling request superseded:', requestId);
-        return;
-      }
-      if (enabledPrayers[prayer.name]) {
-        const id = await scheduleAthanNotification(prayer, true, soundType);
-        if (id) scheduledCount++;
+    const today = new Date();
+    for (let dayOffset = 0; dayOffset < NOTIFICATION_SCHEDULE_DAYS; dayOffset += 1) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + dayOffset);
+      const dayPrayers = dayOffset === 0
+        ? prayers
+        : calculatePrayerTimes(date, latitude, longitude, getTimezoneOffset(), offsets).prayers;
+
+      for (const prayer of dayPrayers) {
+        if (requestId !== latestSchedulingRequest) {
+          console.log('[Notifications] Scheduling request superseded:', requestId);
+          return;
+        }
+        if (enabledPrayers[prayer.name]) {
+          const id = await scheduleAthanNotification(prayer, true, soundType);
+          if (id) scheduledCount += 1;
+        }
       }
     }
 
-    if (scheduledCount === 0 && requestId === latestSchedulingRequest) {
-      console.log('[Notifications] No future prayers today, scheduling tomorrow\'s prayers');
-      await scheduleTomorrowNotifications(latitude, longitude, offsets, enabledPrayers, soundType);
-    }
+    console.log(`[Notifications] Scheduled ${scheduledCount} Athan alerts across ${NOTIFICATION_SCHEDULE_DAYS} days`);
   });
 
   notificationSchedulingQueue = schedulingTask.catch((error) => {
@@ -246,31 +253,17 @@ export async function scheduleAllNotifications(
   await schedulingTask;
 }
 
-async function scheduleTomorrowNotifications(
-  latitude: number,
-  longitude: number,
-  offsets: Record<PrayerName, number>,
-  enabledPrayers: Record<PrayerName, boolean>,
-  soundType: NotificationSoundType
-): Promise<void> {
+export async function showLocationUpdatedNotification(locationName: string): Promise<void> {
   if (Platform.OS === 'web') return;
-
-  try {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tz = getTimezoneOffset();
-
-    const tomorrowPrayers = calculatePrayerTimes(tomorrow, latitude, longitude, tz, offsets);
-
-    for (const prayer of tomorrowPrayers.prayers) {
-      if (enabledPrayers[prayer.name]) {
-        await scheduleAthanNotification(prayer, true, soundType);
-      }
-    }
-    console.log('[Notifications] Tomorrow prayers scheduled');
-  } catch (e) {
-    console.error('[Notifications] Error scheduling tomorrow:', e);
-  }
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'أذان السليماني',
+      body: `نوّرت ${locationName} 🤍، وتم تحديث مواقيت الصلاة حسب موقعك الحالي.`,
+      sound: true,
+      data: { type: 'location-updated', locationName },
+    },
+    trigger: null,
+  });
 }
 
 export async function cancelAllNotifications(): Promise<void> {
