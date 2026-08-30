@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.rork.alsulaimani-athan",
-      "buildNumber": "22",
+      "buildNumber": "24",
       "appleTeamId": "4FX7S5KVYY",
       "config": {
         "usesNonExemptEncryption": false
