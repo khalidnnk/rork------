@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import * as Location from 'expo-location';
 import Colors from '@/constants/colors';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface LocationOnboardingProps {
   onComplete: (granted: boolean) => void;
@@ -23,6 +24,7 @@ interface LocationOnboardingProps {
 export default function LocationOnboarding({ onComplete }: LocationOnboardingProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
+  const { isRTL, t } = useLanguage();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const iconScale = useRef(new Animated.Value(0.3)).current;
@@ -117,18 +119,18 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
   const features = [
     {
       icon: <Navigation size={20} color={Colors.accent} />,
-      title: 'مواقيت دقيقة حسب موقعك',
-      subtitle: 'حساب أوقات الصلاة بدقة بناءً على إحداثياتك الجغرافية',
+      title: t('onboardingAccurateTitle'),
+      subtitle: t('onboardingAccurateSubtitle'),
     },
     {
       icon: <MapPin size={20} color={Colors.accent} />,
-      title: 'تحديث تلقائي أثناء السفر',
-      subtitle: 'يمكنك لاحقاً تفعيل الموقع دائماً لتحديث المواقيت عند الانتقال دون فتح التطبيق',
+      title: t('onboardingTravelTitle'),
+      subtitle: t('onboardingTravelSubtitle'),
     },
     {
       icon: <Shield size={20} color={Colors.teal} />,
-      title: 'خصوصيتك محفوظة',
-      subtitle: 'يُستخدم الموقع لتحديد المدينة وحساب المواقيت عند اختيارك السماح',
+      title: t('onboardingPrivacyTitle'),
+      subtitle: t('onboardingPrivacySubtitle'),
     },
   ];
 
@@ -166,15 +168,15 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
                   source={require('@/assets/images/icon.png')}
                   style={styles.appIcon}
                   contentFit="cover"
-                  accessibilityLabel="صورة عبدالرحمن السليماني"
+                  accessibilityLabel={t('imageLabel')}
                 />
               </View>
             </LinearGradient>
           </Animated.View>
 
-          <Text style={styles.title}>أذان السليماني</Text>
+          <Text style={styles.title}>{t('appName')}</Text>
           <Text style={styles.subtitle}>
-            يستخدم التطبيق موقعك أثناء الاستخدام لتحديد مدينتك وحساب مواقيت الصلاة بدقة. ويمكنك تفعيل التحديث أثناء السفر من الإعدادات
+            {t('onboardingIntro')}
           </Text>
         </View>
 
@@ -194,8 +196,8 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
                 {feature.icon}
               </View>
               <View style={styles.featureText}>
-                <Text style={styles.featureTitle}>{feature.title}</Text>
-                <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+                <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{feature.title}</Text>
+                <Text style={[styles.featureSubtitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{feature.subtitle}</Text>
               </View>
             </Animated.View>
           ))}
@@ -207,7 +209,7 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
             onPress={handleAllow}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="السماح بتحديد الموقع أثناء استخدام التطبيق"
+            accessibilityLabel={t('allowLocationLabel')}
             testID="location-allow-button"
           >
             <LinearGradient
@@ -217,7 +219,7 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
               style={styles.allowButtonGradient}
             >
               <MapPin size={20} color="#0B1A1F" />
-              <Text style={styles.allowButtonText}>السماح بتحديد الموقع</Text>
+              <Text style={styles.allowButtonText}>{t('allowLocation')}</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -226,10 +228,10 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
             onPress={handleSkip}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="تخطي تحديد الموقع واختيار المدينة يدويًا"
+            accessibilityLabel={t('skipManualLabel')}
             testID="location-skip-button"
           >
-            <Text style={styles.skipButtonText}>تخطي واختيار المدينة يدوياً</Text>
+            <Text style={styles.skipButtonText}>{t('skipManual')}</Text>
           </TouchableOpacity>
         </Animated.View>
         </Animated.View>

@@ -7,6 +7,7 @@ import { calculatePrayerTimes, getTimezoneOffset } from '@/utils/prayerTimes';
 import { scheduleAllNotifications, showLocationUpdatedNotification } from '@/utils/notifications';
 import { publishWidgetData } from '@/utils/widgetData';
 import { ALL_CITIES } from '@/constants/cities';
+import { AppLanguage, getStoredLanguage, translate } from '@/utils/i18n';
 
 export const BACKGROUND_LOCATION_TASK = 'athan-significant-location-change';
 export const ATHAN_SETTINGS_STORAGE_KEY = 'athan_settings_v3';
@@ -32,7 +33,7 @@ function distanceInMeters(
   return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export async function resolveLocationName(latitude: number, longitude: number): Promise<string> {
+export async function resolveLocationName(latitude: number, longitude: number, language: AppLanguage = 'ar'): Promise<string> {
   try {
     const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
     const address = addresses[0];
@@ -42,7 +43,7 @@ export async function resolveLocationName(latitude: number, longitude: number): 
         || address.subregion
         || address.region
         || address.country
-        || 'المنطقة الجديدة';
+        || translate(language, 'newArea');
     }
   } catch (error) {
     console.log('[BackgroundLocation] Reverse geocode failed:', error);
@@ -54,7 +55,7 @@ export async function resolveLocationName(latitude: number, longitude: number): 
   const nearestCity = ALL_CITIES.reduce<{ name: string; distance: number } | null>((nearest, city) => {
     const distance = distanceInMeters(latitude, longitude, city.latitude, city.longitude);
     if (!nearest || distance < nearest.distance) {
-      return { name: city.nameAr, distance };
+      return { name: language === 'ar' ? city.nameAr : city.name, distance };
     }
     return nearest;
   }, null);
@@ -62,7 +63,7 @@ export async function resolveLocationName(latitude: number, longitude: number): 
   // Avoid naming a distant city when the user is outside the bundled coverage.
   return nearestCity && nearestCity.distance <= 150_000
     ? nearestCity.name
-    : 'موقعك الحالي';
+    : translate(language, 'yourCurrentLocation');
 }
 
 TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
@@ -83,7 +84,8 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
     const travelled = distanceInMeters(settings.latitude, settings.longitude, latitude, longitude);
     if (travelled < MINIMUM_TRAVEL_DISTANCE_METERS) return;
 
-    const locationName = await resolveLocationName(latitude, longitude);
+    const language = await getStoredLanguage();
+    const locationName = await resolveLocationName(latitude, longitude, language);
     const timezone = getTimezoneOffset();
     const updatedSettings: AthanSettings = {
       ...settings,
@@ -95,7 +97,7 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
     };
 
     await AsyncStorage.setItem(ATHAN_SETTINGS_STORAGE_KEY, JSON.stringify(updatedSettings));
-    publishWidgetData(updatedSettings);
+    publishWidgetData(updatedSettings, language);
 
     if (updatedSettings.globalEnabled) {
       const prayers = calculatePrayerTimes(
@@ -111,9 +113,10 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
         updatedSettings.notificationSound,
         latitude,
         longitude,
-        updatedSettings.offsets
+        updatedSettings.offsets,
+        language
       );
-      await showLocationUpdatedNotification(locationName);
+      await showLocationUpdatedNotification(locationName, language);
     }
   } catch (taskError) {
     console.error('[BackgroundLocation] Failed to update location:', taskError);
@@ -122,6 +125,7 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
 
 export async function startBackgroundLocationUpdates(): Promise<void> {
   if (Platform.OS === 'web') return;
+  const language = await getStoredLanguage();
   const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
   if (isRegistered) return;
 
@@ -134,8 +138,8 @@ export async function startBackgroundLocationUpdates(): Promise<void> {
     activityType: Location.ActivityType.Other,
     showsBackgroundLocationIndicator: false,
     foregroundService: {
-      notificationTitle: 'أذان السليماني',
-      notificationBody: 'تحديث مواقيت الصلاة تلقائيًا عند السفر',
+      notificationTitle: translate(language, 'appName'),
+      notificationBody: translate(language, 'backgroundUpdate'),
       notificationColor: '#C9A84C',
     },
   });

@@ -30,6 +30,8 @@ import Colors from '@/constants/colors';
 import { useAthan } from '@/contexts/AthanContext';
 import { getTimeUntil, PrayerName } from '@/utils/prayerTimes';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { localizedLocationName } from '@/utils/i18n';
 
 const PRAYER_ICONS: Record<PrayerName, React.ComponentType<{ size: number; color: string }>> = {
   fajr: Sunrise,
@@ -41,6 +43,7 @@ const PRAYER_ICONS: Record<PrayerName, React.ComponentType<{ size: number; color
 
 function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
   const reduceMotion = useReducedMotion();
+  const { t } = useLanguage();
   const aboutFadeAnim = useRef(new Animated.Value(0)).current;
   const aboutScaleAnim = useRef(new Animated.Value(0.9)).current;
 
@@ -102,23 +105,23 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
               <Heart size={32} color={Colors.accent} fill={Colors.accent} />
             </View>
 
-            <Text style={styles.welcomeTitle}>عن التطبيق</Text>
+            <Text style={styles.welcomeTitle}>{t('about')}</Text>
 
             <Text style={styles.aboutMessage}>
-              تم إنشاء هذا التطبيق احتساباً للأجر عن عبدالرحمن السليماني
+              {t('aboutCreated')}
             </Text>
 
             <View style={styles.welcomeDivider} />
 
             <Text style={styles.aboutDua}>
-              اللهم اجعل له أجراً ومغفرة بكل (الله أكبر) ترفع في هذا التطبيق
+              {t('aboutDua')}
             </Text>
 
             <Image
               source={require('@/assets/images/icon.png')}
               style={styles.welcomeAppIcon}
               contentFit="cover"
-              accessibilityLabel="صورة عبدالرحمن السليماني"
+              accessibilityLabel={t('imageLabel')}
             />
 
             <TouchableOpacity
@@ -126,7 +129,7 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
               onPress={handleDismiss}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="إغلاق نافذة عن التطبيق"
+              accessibilityLabel={t('close')}
             >
               <LinearGradient
                 colors={[Colors.accent, '#B8922E']}
@@ -134,7 +137,7 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
                 end={{ x: 1, y: 0 }}
                 style={styles.welcomeButtonGradient}
               >
-                <Text style={styles.welcomeButtonText}>إغلاق</Text>
+                <Text style={styles.welcomeButtonText}>{t('close')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </LinearGradient>
@@ -146,6 +149,7 @@ function AboutModal({ visible, onDismiss }: { visible: boolean; onDismiss: () =>
 
 function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
   const reduceMotion = useReducedMotion();
+  const { t } = useLanguage();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
@@ -205,12 +209,9 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
               <Heart size={32} color={Colors.accent} fill={Colors.accent} />
             </View>
 
-            <Text style={styles.welcomeTitle}>أذان السليماني</Text>
+            <Text style={styles.welcomeTitle}>{t('appName')}</Text>
 
-            <Text style={styles.aboutMessage}>
-              ليبقى أثر صوته حاضرًا،{'\n'}
-              يصدح بالأذان في كل وقت صلاة
-            </Text>
+            <Text style={styles.aboutMessage}>{t('welcomeSubtitle')}</Text>
 
             <View style={styles.welcomeDivider} />
 
@@ -218,7 +219,7 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
               source={require('@/assets/images/icon.png')}
               style={styles.welcomeAppIcon}
               contentFit="cover"
-              accessibilityLabel="صورة عبدالرحمن السليماني"
+              accessibilityLabel={t('imageLabel')}
             />
 
             <TouchableOpacity
@@ -226,7 +227,7 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
               onPress={handleDismiss}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="بدء استخدام التطبيق"
+              accessibilityLabel={t('start')}
             >
               <LinearGradient
                 colors={[Colors.accent, '#B8922E']}
@@ -234,7 +235,7 @@ function WelcomeModal({ visible, onDismiss }: { visible: boolean; onDismiss: () 
                 end={{ x: 1, y: 0 }}
                 style={styles.welcomeButtonGradient}
               >
-                <Text style={styles.welcomeButtonText}>ابدأ</Text>
+                <Text style={styles.welcomeButtonText}>{t('start')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </LinearGradient>
@@ -249,6 +250,7 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const reduceMotion = useReducedMotion();
+  const { language, t } = useLanguage();
   const {
     settings,
     dailyPrayers,
@@ -337,7 +339,7 @@ export default function HomeScreen() {
   }, [dismissWelcome]);
 
   const now = new Date();
-  const dateStr = now.toLocaleDateString('ar-SA', {
+  const dateStr = now.toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -377,8 +379,8 @@ export default function HomeScreen() {
                 contentFit="cover"
               />
               <View style={styles.appTitle}>
-                <Text style={styles.titleTextAr}>أذان السليماني</Text>
-                <Text style={styles.subtitleText}>Alsulaimani Athan</Text>
+                <Text style={styles.titleTextAr}>{t('appName')}</Text>
+                {language === 'ar' && <Text style={styles.subtitleText}>{t('appNameEn')}</Text>}
               </View>
             </View>
             <TouchableOpacity
@@ -389,7 +391,7 @@ export default function HomeScreen() {
                 }}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="عن التطبيق"
+              accessibilityLabel={t('about')}
                 testID="about-button"
               >
                 <Info size={18} color={Colors.textSecondary} />
@@ -399,7 +401,7 @@ export default function HomeScreen() {
           <View style={styles.locationRow}>
             <MapPin size={12} color={Colors.textSecondary} />
             <Text style={styles.locationText}>
-              {locationLoading ? 'جارٍ تحديد الموقع...' : settings.locationName}
+              {locationLoading ? t('locating') : localizedLocationName(settings.locationName, settings.latitude, settings.longitude, language)}
             </Text>
           </View>
           <Text style={styles.dateText}>{dateStr}</Text>
@@ -415,32 +417,32 @@ export default function HomeScreen() {
             >
               <View style={styles.countdownHeader}>
                 <Clock size={13} color={Colors.accent} />
-                <Text style={styles.countdownLabel}>الصلاة القادمة</Text>
+                <Text style={styles.countdownLabel}>{t('nextPrayer')}</Text>
               </View>
 
-              <Text style={styles.countdownPrayerAr}>{nextPrayer.labelAr}</Text>
-              <Text style={styles.countdownPrayerEn}>{nextPrayer.label}</Text>
+              <Text style={styles.countdownPrayerAr}>{language === 'ar' ? nextPrayer.labelAr : nextPrayer.label}</Text>
+              {language === 'ar' && <Text style={styles.countdownPrayerEn}>{nextPrayer.label}</Text>}
 
               <View style={styles.countdownTimerRow}>
                 <View style={styles.timerSegment}>
                   <View style={styles.timerBox}>
                     <Text style={styles.timerNumber}>{padNum(countdown.hours)}</Text>
                   </View>
-                  <Text style={styles.timerUnit}>ساعة</Text>
+                  <Text style={styles.timerUnit}>{t('hour')}</Text>
                 </View>
                 <Text style={styles.timerColon}>:</Text>
                 <View style={styles.timerSegment}>
                   <View style={styles.timerBox}>
                     <Text style={styles.timerNumber}>{padNum(countdown.minutes)}</Text>
                   </View>
-                  <Text style={styles.timerUnit}>دقيقة</Text>
+                  <Text style={styles.timerUnit}>{t('minute')}</Text>
                 </View>
                 <Text style={styles.timerColon}>:</Text>
                 <View style={styles.timerSegment}>
                   <View style={styles.timerBox}>
                     <Text style={styles.timerNumber}>{padNum(countdown.seconds)}</Text>
                   </View>
-                  <Text style={styles.timerUnit}>ثانية</Text>
+                  <Text style={styles.timerUnit}>{t('second')}</Text>
                 </View>
               </View>
 
@@ -450,8 +452,8 @@ export default function HomeScreen() {
         )}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>مواقيت اليوم</Text>
-          <Text style={styles.sectionSubtitle}>تقويم أم القرى</Text>
+          <Text style={styles.sectionTitle}>{t('todayPrayers')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('ummAlQura')}</Text>
         </View>
 
         <View style={styles.prayerList}>
@@ -497,7 +499,7 @@ export default function HomeScreen() {
                           isPast && styles.prayerNamePast,
                         ]}
                       >
-                        {prayer.labelAr}
+                        {language === 'ar' ? prayer.labelAr : prayer.label}
                       </Text>
                       <Text
                         style={[
@@ -505,11 +507,11 @@ export default function HomeScreen() {
                           isPast && styles.prayerNamePast,
                         ]}
                       >
-                        {prayer.label}
+                        {language === 'ar' ? prayer.label : prayer.labelAr}
                       </Text>
                     </View>
                     {offset > 0 && (
-                      <Text style={styles.offsetBadge}>+{offset} دقيقة</Text>
+                      <Text style={styles.offsetBadge}>+{offset} {t('minutes')}</Text>
                     )}
                   </View>
                 </View>
@@ -580,7 +582,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontFamily: 'Dubai-Bold',
     color: Colors.text,
-    writingDirection: 'rtl',
   },
   subtitleText: {
     fontSize: 13,
@@ -605,7 +606,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Dubai-Medium',
     color: '#FFFFFF',
-    writingDirection: 'rtl',
   },
   countdownCard: {
     borderRadius: 20,

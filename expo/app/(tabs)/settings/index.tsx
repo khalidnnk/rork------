@@ -30,6 +30,7 @@ import {
   Sun,
   Calculator,
   Route,
+  Languages,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -40,19 +41,14 @@ import CityPickerModal from '@/components/CityPickerModal';
 import { City } from '@/constants/cities';
 import { List } from 'lucide-react-native';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
-
-const SOUND_OPTIONS: { key: NotificationSoundType; label: string; description: string }[] = [
-  { key: 'full_athan', label: 'الأذان كاملاً', description: '٣٠ ثانية في التنبيه ويكمل داخل التطبيق' },
-  { key: 'athan', label: 'حي على الصلاة', description: 'مقطع قصير من الأذان' },
-  { key: 'allahu_akbar', label: 'الله أكبر', description: 'تكبيرة تنبيه' },
-  { key: 'default', label: 'صوت النظام', description: 'نغمة التنبيه الافتراضية' },
-  { key: 'silent', label: 'صامت', description: 'بدون صوت' },
-];
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguagePreference, localizedLocationName } from '@/utils/i18n';
 
 const OFFSET_OPTIONS = [0, 2, 5];
 
 function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean; onStop: () => void; playerStatus: { currentTime: number; duration: number; playing: boolean } }) {
   const reduceMotion = useReducedMotion();
+  const { t } = useLanguage();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const waveAnim1 = useRef(new Animated.Value(1)).current;
@@ -175,8 +171,8 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
             />
           </View>
 
-          <Text style={athanStyles.playingLabel}>جارٍ تشغيل الأذان</Text>
-          <Text style={athanStyles.playingBismillah}>الله أكبر الله أكبر</Text>
+          <Text style={athanStyles.playingLabel}>{t('playingAthan')}</Text>
+          <Text style={athanStyles.playingBismillah}>{t('playingTakbir')}</Text>
 
           <View style={athanStyles.progressContainer}>
             <View style={athanStyles.progressBar}>
@@ -194,7 +190,7 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
             activeOpacity={0.8}
             testID="stop-athan-modal"
             accessibilityRole="button"
-            accessibilityLabel="إيقاف الأذان"
+            accessibilityLabel={t('stopAthan')}
           >
             <LinearGradient
               colors={['#E74C3C', '#C0392B']}
@@ -203,7 +199,7 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
               style={athanStyles.stopButtonGradient}
             >
               <Square size={22} color="#fff" fill="#fff" />
-              <Text style={athanStyles.stopButtonText}>إيقاف الأذان</Text>
+              <Text style={athanStyles.stopButtonText}>{t('stopAthan')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -212,19 +208,19 @@ function AthanPlayerModal({ visible, onStop, playerStatus }: { visible: boolean;
   );
 }
 
-const PRAYER_LABELS_AR: Record<PrayerName, string> = {
-  fajr: 'الفجر',
-  dhuhr: 'الظهر',
-  asr: 'العصر',
-  maghrib: 'المغرب',
-  isha: 'العشاء',
-};
-
-
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const { preference, setPreference, language, t } = useLanguage();
+  const prayerLabel = useCallback((name: PrayerName) => t(name), [t]);
+  const soundOptions: { key: NotificationSoundType; label: string; description: string }[] = [
+    { key: 'full_athan', label: t('fullAthan'), description: t('fullAthanDescription') },
+    { key: 'athan', label: t('haya'), description: t('hayaDescription') },
+    { key: 'allahu_akbar', label: t('allahuAkbar'), description: t('allahuAkbarDescription') },
+    { key: 'default', label: t('systemSound'), description: t('systemSoundDescription') },
+    { key: 'silent', label: t('silent'), description: t('silentDescription') },
+  ];
   const {
     settings,
     togglePrayer,
@@ -289,15 +285,15 @@ export default function SettingsScreen() {
       }
       if (enabled && !granted) {
         Alert.alert(
-          'يلزم السماح بالموقع دائمًا',
-          'لتحديث مواقيت الصلاة عند السفر دون فتح التطبيق، اختر السماح بالموقع دائمًا من إعدادات الجهاز.'
+          t('alwaysLocationTitle'),
+          t('alwaysLocationMessage')
         );
       }
     } catch (error) {
       console.error('[Settings] Background location toggle failed:', error);
-      Alert.alert('تعذر تفعيل التحديث التلقائي', 'تأكد من صلاحية الموقع ثم حاول مرة أخرى.');
+      Alert.alert(t('autoUpdateFailed'), t('checkLocationPermission'));
     }
-  }, [detectAutoLocation, setBackgroundLocationEnabled]);
+  }, [detectAutoLocation, setBackgroundLocationEnabled, t]);
 
   const handleSoundChange = useCallback(
     (sound: NotificationSoundType) => {
@@ -329,7 +325,7 @@ export default function SettingsScreen() {
       latitude: city.latitude,
       longitude: city.longitude,
       timezone: city.timezone,
-      locationName: city.nameAr,
+      locationName: city.name,
       locationMode: 'manual',
     });
     setCityPickerVisible(false);
@@ -374,11 +370,43 @@ export default function SettingsScreen() {
       >
         <View style={styles.header}>
           <Settings size={22} color={Colors.accent} />
-          <Text style={styles.headerTitle}>الإعدادات</Text>
+          <Text style={styles.headerTitle}>{t('settings')}</Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>المنبّه</Text>
+          <Text style={styles.sectionLabel}>{t('language')}</Text>
+          <Text style={styles.sectionDescription}>{t('languageDescription')}</Text>
+          <View style={styles.card}>
+            <View style={styles.languageHeader}>
+              <Languages size={18} color={Colors.accent} />
+              <Text style={styles.cardRowTitle}>{t('language')}</Text>
+            </View>
+            <View style={styles.languageOptions}>
+              {([
+                ['system', t('systemLanguage')],
+                ['ar', t('arabic')],
+                ['en', t('english')],
+              ] as [LanguagePreference, string][]).map(([value, label]) => {
+                const selected = preference === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    style={[styles.languageChip, selected && styles.languageChipActive]}
+                    onPress={() => void setPreference(value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={label}
+                  >
+                    <Text style={[styles.languageChipText, selected && styles.languageChipTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{t('alarm')}</Text>
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <View style={styles.cardRowLeft}>
@@ -388,9 +416,9 @@ export default function SettingsScreen() {
                   <BellOff size={18} color={Colors.danger} />
                 )}
                 <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>الأذان العام</Text>
+                  <Text style={styles.cardRowTitle}>{t('globalAthan')}</Text>
                   <Text style={styles.cardRowSubtitle}>
-                    {settings.globalEnabled ? 'الإشعارات مفعّلة' : 'جميع الإشعارات متوقفة'}
+                    {settings.globalEnabled ? t('notificationsEnabled') : t('notificationsDisabled')}
                   </Text>
                 </View>
               </View>
@@ -400,14 +428,14 @@ export default function SettingsScreen() {
                 trackColor={{ false: Colors.surface, true: Colors.accent }}
                 thumbColor={Colors.white}
                 testID="global-switch"
-                accessibilityLabel="تفعيل جميع تنبيهات الأذان"
+                accessibilityLabel={t('enableAllAlerts')}
               />
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>تشغيل الأذان</Text>
+          <Text style={styles.sectionLabel}>{t('playAthan')}</Text>
           <View style={styles.card}>
             <View style={styles.athanPlayerWrap}>
               <TouchableOpacity
@@ -416,7 +444,7 @@ export default function SettingsScreen() {
                 activeOpacity={0.7}
                 testID="play-stop-athan"
                 accessibilityRole="button"
-                accessibilityLabel="تشغيل الأذان كاملاً"
+                accessibilityLabel={t('playFullAthan')}
               >
                 <LinearGradient
                   colors={[Colors.accent, '#B8922E']}
@@ -425,7 +453,7 @@ export default function SettingsScreen() {
                   style={styles.playStopGradient}
                 >
                   <Play size={20} color="#0B1A1F" fill="#0B1A1F" />
-                  <Text style={styles.playStopText}>تشغيل الأذان كاملاً</Text>
+                  <Text style={styles.playStopText}>{t('playFullAthan')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -433,12 +461,12 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>صوت التنبيه</Text>
+          <Text style={styles.sectionLabel}>{t('notificationSound')}</Text>
           <Text style={styles.sectionDescription}>
-            اختر الصوت الذي يصدر عند وقت الصلاة
+            {t('notificationSoundDescription')}
           </Text>
           <View style={styles.card}>
-            {SOUND_OPTIONS.map((option, index) => {
+            {soundOptions.map((option, index) => {
               const isActive = settings.notificationSound === option.key;
               return (
                 <View key={option.key}>
@@ -472,7 +500,7 @@ export default function SettingsScreen() {
                           activeOpacity={0.6}
                           testID={`preview-${option.key}`}
                           accessibilityRole="button"
-                          accessibilityLabel={`معاينة صوت ${option.label}`}
+                          accessibilityLabel={t('previewSound', { sound: option.label })}
                         >
                           {isPreviewPlaying && previewingSoundType === option.key ? (
                             <Square size={13} color={Colors.accent} fill={Colors.accent} />
@@ -483,7 +511,7 @@ export default function SettingsScreen() {
                       )}
                       {isActive && (
                         <View style={styles.activeLabel}>
-                          <Text style={styles.activeLabelText}>مفعّل</Text>
+                          <Text style={styles.activeLabelText}>{t('enabled')}</Text>
                         </View>
                       )}
                     </View>
@@ -495,7 +523,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>تفعيل الصلوات</Text>
+          <Text style={styles.sectionLabel}>{t('enablePrayers')}</Text>
           <View style={styles.card}>
             {prayerNames.map((name, index) => (
               <View key={name}>
@@ -510,7 +538,7 @@ export default function SettingsScreen() {
                           : Colors.textMuted
                       }
                     />
-                    <Text style={styles.prayerToggleName}>{PRAYER_LABELS_AR[name]}</Text>
+                    <Text style={styles.prayerToggleName}>{prayerLabel(name)}</Text>
                   </View>
                   <Switch
                     value={settings.enabledPrayers[name]}
@@ -518,7 +546,7 @@ export default function SettingsScreen() {
                     trackColor={{ false: Colors.surface, true: Colors.accent }}
                     thumbColor={Colors.white}
                     testID={`toggle-${name}`}
-                    accessibilityLabel={`تفعيل تنبيه صلاة ${PRAYER_LABELS_AR[name]}`}
+                    accessibilityLabel={t('enablePrayerAlert', { prayer: prayerLabel(name) })}
                   />
                 </View>
               </View>
@@ -527,16 +555,16 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>تأخير وقت الأذان</Text>
+          <Text style={styles.sectionLabel}>{t('delayAthan')}</Text>
           <Text style={styles.sectionDescription}>
-            إضافة دقائق بعد وقت الصلاة المحسوب
+            {t('delayDescription')}
           </Text>
           <View style={styles.card}>
             {prayerNames.map((name, index) => (
               <View key={name}>
                 {index > 0 && <View style={styles.divider} />}
                 <View style={styles.offsetRow}>
-                  <Text style={styles.offsetPrayerName}>{PRAYER_LABELS_AR[name]}</Text>
+                  <Text style={styles.offsetPrayerName}>{prayerLabel(name)}</Text>
                   <View style={styles.offsetOptions}>
                     {OFFSET_OPTIONS.map((opt) => {
                       const isActive = settings.offsets[name] === opt;
@@ -551,7 +579,7 @@ export default function SettingsScreen() {
                           activeOpacity={0.7}
                           accessibilityRole="button"
                           accessibilityState={{ selected: isActive }}
-                          accessibilityLabel={`${PRAYER_LABELS_AR[name]}، ${opt === 0 ? 'بدون تأخير' : `تأخير ${opt} دقائق`}`}
+                          accessibilityLabel={`${prayerLabel(name)}, ${opt === 0 ? t('noDelay') : t('delayMinutes', { minutes: opt })}`}
                         >
                           <Text
                             style={[
@@ -559,7 +587,7 @@ export default function SettingsScreen() {
                               isActive && styles.offsetChipTextActive,
                             ]}
                           >
-                            {opt === 0 ? 'دقيق' : `+${opt}`}
+                            {opt === 0 ? t('onTime') : `+${opt}`}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -572,15 +600,15 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>الموقع</Text>
+          <Text style={styles.sectionLabel}>{t('location')}</Text>
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <View style={styles.cardRowLeft}>
                 <MapPin size={18} color={Colors.accent} />
                 <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>الموقع الحالي</Text>
+                  <Text style={styles.cardRowTitle}>{t('currentLocation')}</Text>
                   <Text style={styles.cardRowSubtitle}>
-                    {locationLoading ? 'جارٍ تحديد الموقع...' : settings.locationName}
+                    {locationLoading ? t('locating') : localizedLocationName(settings.locationName, settings.latitude, settings.longitude, language)}
                   </Text>
                 </View>
               </View>
@@ -592,9 +620,9 @@ export default function SettingsScreen() {
               <View style={styles.cardRowLeft}>
                 <Route size={18} color={settings.backgroundLocationEnabled ? Colors.accent : Colors.textSecondary} />
                 <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>التحديث أثناء السفر</Text>
+                  <Text style={styles.cardRowTitle}>{t('travelUpdates')}</Text>
                   <Text style={styles.cardRowSubtitle}>
-                    يحدّث الموقع والمواقيت تلقائيًا عند الانتقال لمسافة ملحوظة
+                    {t('travelUpdatesDescription')}
                   </Text>
                 </View>
               </View>
@@ -604,7 +632,7 @@ export default function SettingsScreen() {
                 trackColor={{ false: Colors.surface, true: Colors.accent }}
                 thumbColor={Colors.white}
                 testID="background-location-switch"
-                accessibilityLabel="تحديث الموقع ومواقيت الصلاة تلقائيًا أثناء السفر"
+                accessibilityLabel={t('travelUpdatesLabel')}
               />
             </View>
 
@@ -614,7 +642,7 @@ export default function SettingsScreen() {
               <View style={styles.cardRowLeft}>
                 <Compass size={18} color={Colors.textSecondary} />
                 <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>الإحداثيات</Text>
+                  <Text style={styles.cardRowTitle}>{t('coordinates')}</Text>
                   <Text style={styles.cardRowSubtitle}>
                     {settings.latitude.toFixed(4)}°N, {settings.longitude.toFixed(4)}°E
                   </Text>
@@ -628,7 +656,7 @@ export default function SettingsScreen() {
               <View style={styles.cardRowLeft}>
                 <Clock size={18} color={Colors.textSecondary} />
                 <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>المنطقة الزمنية</Text>
+                  <Text style={styles.cardRowTitle}>{t('timezone')}</Text>
                   <Text style={styles.cardRowSubtitle}>
                     UTC{settings.timezone >= 0 ? '+' : ''}{settings.timezone}
                   </Text>
@@ -645,11 +673,11 @@ export default function SettingsScreen() {
                 activeOpacity={0.7}
                 testID="refresh-location"
                 accessibilityRole="button"
-                accessibilityLabel="تحديث الموقع الحالي باستخدام GPS"
+                accessibilityLabel={t('refreshGpsLabel')}
               >
                 <Navigation size={15} color={Colors.teal} />
                 <Text style={styles.locationActionTextTeal}>
-                  {locationLoading ? 'جارٍ التحديث...' : 'تحديد تلقائي GPS'}
+                  {locationLoading ? t('updating') : t('autoGps')}
                 </Text>
               </TouchableOpacity>
 
@@ -661,10 +689,10 @@ export default function SettingsScreen() {
                 activeOpacity={0.7}
                 testID="open-city-picker"
                 accessibilityRole="button"
-                accessibilityLabel="اختيار المدينة يدويًا"
+                accessibilityLabel={t('manualCityLabel')}
               >
                 <List size={15} color={Colors.accent} />
-                <Text style={styles.locationActionTextAccent}>اختيار المدينة يدوياً</Text>
+                <Text style={styles.locationActionTextAccent}>{t('manualCity')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -678,18 +706,18 @@ export default function SettingsScreen() {
         />
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>طريقة الحساب</Text>
+          <Text style={styles.sectionLabel}>{t('calculationMethod')}</Text>
           <View style={styles.card}>
             <View style={styles.cardRow}>
               <View style={styles.cardRowLeft}>
                 <Calculator size={18} color={Colors.accent} />
                 <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>تقويم أم القرى (مكة)</Text>
-                  <Text style={styles.cardRowSubtitle}>تُحسب المواقيت داخل الجهاز وتعمل دون إنترنت</Text>
+                  <Text style={styles.cardRowTitle}>{t('ummAlQuraMakkah')}</Text>
+                  <Text style={styles.cardRowSubtitle}>{t('offlineCalculation')}</Text>
                 </View>
               </View>
               <View style={styles.lockedLabel}>
-                <Text style={styles.lockedLabelText}>ثابت</Text>
+                <Text style={styles.lockedLabelText}>{t('fixed')}</Text>
               </View>
             </View>
 
@@ -698,14 +726,14 @@ export default function SettingsScreen() {
             <View style={styles.calcDetailRow}>
               <View style={styles.calcDetailItem}>
                 <Sun size={14} color={Colors.textSecondary} />
-                <Text style={styles.calcDetailLabel}>الفجر</Text>
+                <Text style={styles.calcDetailLabel}>{t('fajr')}</Text>
                 <Text style={styles.calcDetailValue}>18.5°</Text>
               </View>
               <View style={styles.calcDetailSeparator} />
               <View style={styles.calcDetailItem}>
                 <Moon size={14} color={Colors.textSecondary} />
-                <Text style={styles.calcDetailLabel}>العشاء</Text>
-                <Text style={styles.calcDetailValue}>90 د بعد المغرب</Text>
+                <Text style={styles.calcDetailLabel}>{t('isha')}</Text>
+                <Text style={styles.calcDetailValue}>{t('ishaAfterMaghrib')}</Text>
               </View>
             </View>
 
@@ -714,12 +742,12 @@ export default function SettingsScreen() {
             <View style={styles.calcRamadanRow}>
               <View style={styles.ramadanBadge}>
                 <Moon size={12} color={Colors.accent} />
-                <Text style={styles.ramadanBadgeText}>رمضان</Text>
+                <Text style={styles.ramadanBadgeText}>{t('ramadan')}</Text>
               </View>
               <View style={styles.calcDetailTextWrap}>
-                <Text style={styles.calcRamadanTitle}>العشاء في رمضان</Text>
+                <Text style={styles.calcRamadanTitle}>{t('ramadanIsha')}</Text>
                 <Text style={styles.calcRamadanSubtitle}>
-                  120 دقيقة بعد المغرب (بدلاً من 90)
+                  {t('ramadanIshaDetail')}
                 </Text>
               </View>
             </View>
@@ -728,7 +756,7 @@ export default function SettingsScreen() {
 
         <View style={styles.dedicationCard}>
           <Text style={styles.dedicationText}>
-            ليبقى أثر صوته حاضرًا
+            {t('dedication')}
           </Text>
         </View>
       </ScrollView>
@@ -771,18 +799,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Dubai-Bold',
     color: Colors.textMutedReadable,
     marginBottom: 8,
-    marginLeft: 4,
-    writingDirection: 'rtl',
-    textAlign: 'right',
+    marginHorizontal: 4,
   },
   sectionDescription: {
     fontSize: 14,
     fontFamily: 'Dubai-Medium',
     color: Colors.textSecondary,
     marginBottom: 8,
-    marginRight: 4,
-    writingDirection: 'rtl',
-    textAlign: 'right',
+    marginHorizontal: 4,
   },
   card: {
     backgroundColor: Colors.card,
@@ -790,6 +814,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     overflow: 'hidden',
+  },
+  languageHeader: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  languageOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    padding: 12,
+    paddingTop: 8,
+  },
+  languageChip: {
+    flex: 1,
+    minWidth: 90,
+    minHeight: 44,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  languageChipActive: {
+    backgroundColor: Colors.accentDim,
+    borderColor: Colors.accent,
+  },
+  languageChipText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontFamily: 'Dubai-Medium',
+    textAlign: 'center',
+  },
+  languageChipTextActive: {
+    color: Colors.accentLight,
+    fontFamily: 'Dubai-Bold',
   },
   cardRow: {
     flexDirection: 'row',

@@ -1,11 +1,13 @@
 import { Platform } from 'react-native';
 import type { AthanSettings } from '@/contexts/AthanContext';
 import { calculatePrayerTimes, getTimezoneOffset } from '@/utils/prayerTimes';
+import { ALL_CITIES } from '@/constants/cities';
+import type { AppLanguage } from '@/utils/i18n';
 
 const APP_GROUP = 'group.app.alsulaimani.athan';
 const WIDGET_KIND = 'AlsulaimaniPrayerWidget';
 
-export function publishWidgetData(settings: AthanSettings): void {
+export function publishWidgetData(settings: AthanSettings, language?: AppLanguage): void {
   if (Platform.OS !== 'ios') return;
 
   try {
@@ -34,7 +36,14 @@ export function publishWidgetData(settings: AthanSettings): void {
       });
     }
 
+    const city = ALL_CITIES.find((item) =>
+      item.name === settings.locationName || item.nameAr === settings.locationName ||
+      (Math.abs(item.latitude - settings.latitude) < 0.002 && Math.abs(item.longitude - settings.longitude) < 0.002)
+    );
     storage.set('locationName', settings.locationName);
+    storage.set('locationNameAr', city?.nameAr ?? settings.locationName);
+    storage.set('locationNameEn', city?.name ?? settings.locationName);
+    if (language) storage.set('appLanguage', language);
     storage.set('prayersJSON', JSON.stringify(prayers));
     storage.set('lastUpdated', Date.now() / 1000);
     ExtensionStorage.reloadWidget(WIDGET_KIND);

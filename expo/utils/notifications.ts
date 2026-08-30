@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { PrayerTime, PrayerName, calculatePrayerTimes, getTimezoneOffset } from './prayerTimes';
 import type { NotificationSoundType } from '@/contexts/AthanContext';
+import { AppLanguage, getStoredLanguage, translate } from '@/utils/i18n';
 
 let notificationSchedulingQueue: Promise<void> = Promise.resolve();
 let latestSchedulingRequest = 0;
@@ -47,13 +48,13 @@ function getIOSNotificationCategory(soundType: NotificationSoundType): string {
   }
 }
 
-async function setupNotificationCategories(): Promise<void> {
+async function setupNotificationCategories(language: AppLanguage): Promise<void> {
   if (Platform.OS !== 'ios') return;
   try {
     await Notifications.setNotificationCategoryAsync('athan_full', [
       {
         identifier: 'OPEN_ATHAN',
-        buttonTitle: 'استمع للأذان كاملاً',
+        buttonTitle: translate(language, 'listenFullAthan'),
         options: {
           opensAppToForeground: true,
         },
@@ -64,7 +65,7 @@ async function setupNotificationCategories(): Promise<void> {
     await Notifications.setNotificationCategoryAsync('athan_haya', [
       {
         identifier: 'OPEN_ATHAN',
-        buttonTitle: 'فتح التطبيق',
+        buttonTitle: translate(language, 'openApp'),
         options: {
           opensAppToForeground: true,
         },
@@ -75,7 +76,7 @@ async function setupNotificationCategories(): Promise<void> {
     await Notifications.setNotificationCategoryAsync('athan_akbar', [
       {
         identifier: 'OPEN_ATHAN',
-        buttonTitle: 'فتح التطبيق',
+        buttonTitle: translate(language, 'openApp'),
         options: {
           opensAppToForeground: true,
         },
@@ -92,7 +93,8 @@ async function setupNotificationCategories(): Promise<void> {
   }
 }
 
-export async function requestNotificationPermissions(): Promise<boolean> {
+export async function requestNotificationPermissions(language?: AppLanguage): Promise<boolean> {
+  language ??= await getStoredLanguage();
   if (Platform.OS === 'web') {
     console.log('[Notifications] Web platform - skipping permission request');
     return false;
@@ -130,7 +132,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     });
   }
 
-  await setupNotificationCategories();
+  await setupNotificationCategories(language);
 
   console.log('[Notifications] Permission granted');
   return true;
@@ -139,8 +141,10 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 export async function scheduleAthanNotification(
   prayer: PrayerTime,
   enabled: boolean,
-  soundType: NotificationSoundType = 'athan'
+  soundType: NotificationSoundType = 'athan',
+  language?: AppLanguage
 ): Promise<string | null> {
+  language ??= await getStoredLanguage();
   if (Platform.OS === 'web' || !enabled) return null;
 
   const now = new Date();
@@ -162,10 +166,10 @@ export async function scheduleAthanNotification(
     const identifier = `athan-${prayer.name}-${dateKey}`;
 
     const notificationContent: Notifications.NotificationContentInput = {
-      title: `حان وقت صلاة ${prayer.labelAr}`,
+      title: translate(language, 'prayerTimeTitle', { prayer: language === 'ar' ? prayer.labelAr : prayer.label }),
       body: soundType === 'full_athan'
-        ? `${prayer.label} - ${prayer.timeStr} | افتح للاستماع للأذان كاملاً`
-        : `${prayer.label} - ${prayer.timeStr}`,
+        ? translate(language, 'fullAthanBody', { prayer: language === 'ar' ? prayer.labelAr : prayer.label, time: prayer.timeStr })
+        : translate(language, 'prayerBody', { prayer: language === 'ar' ? prayer.labelAr : prayer.label, time: prayer.timeStr }),
       sound: sound,
       data: { prayerName: prayer.name, time: prayer.timeStr, soundType },
     };
@@ -203,7 +207,7 @@ export async function scheduleAthanNotification(
   }
 }
 
-async function scheduleRenewalReminder(fromDate: Date): Promise<void> {
+async function scheduleRenewalReminder(fromDate: Date, language: AppLanguage): Promise<void> {
   const reminderDate = new Date(fromDate);
   reminderDate.setDate(reminderDate.getDate() + RENEWAL_REMINDER_DAYS);
   reminderDate.setHours(19, 0, 0, 0);
@@ -212,15 +216,13 @@ async function scheduleRenewalReminder(fromDate: Date): Promise<void> {
     1,
     Math.floor((reminderDate.getTime() - Date.now()) / 1000)
   );
-  const reason = Platform.OS === 'ios'
-    ? 'السبب: نظام iPhone يحد عدد التنبيهات التي يمكن جدولتها مسبقًا، وفتح التطبيق يجددها تلقائيًا.'
-    : 'السبب: فتح التطبيق يجدد جدول تنبيهات الأذان تلقائيًا.';
+  const reason = translate(language, Platform.OS === 'ios' ? 'renewalReasonIos' : 'renewalReasonOther');
 
   await Notifications.scheduleNotificationAsync({
     identifier: 'athan-renewal-reminder',
     content: {
-      title: 'تجديد تنبيهات الأذان 🤍',
-      body: `افتح التطبيق لتجديد التنبيهات للأيام القادمة.\n${reason}`,
+      title: translate(language, 'renewalTitle'),
+      body: translate(language, 'renewalBody', { reason }),
       sound: 'default',
       data: { type: 'renewal-reminder' },
     },
@@ -237,9 +239,11 @@ export async function scheduleAllNotifications(
   soundType: NotificationSoundType = 'athan',
   latitude: number = 24.7136,
   longitude: number = 46.6753,
-  offsets: Record<PrayerName, number> = { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 }
+  offsets: Record<PrayerName, number> = { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
+  language?: AppLanguage
 ): Promise<void> {
   if (Platform.OS === 'web') return;
+  language ??= await getStoredLanguage();
 
   const requestId = ++latestSchedulingRequest;
   const schedulingTask = notificationSchedulingQueue.then(async () => {
@@ -266,14 +270,14 @@ export async function scheduleAllNotifications(
           return;
         }
         if (enabledPrayers[prayer.name]) {
-          const id = await scheduleAthanNotification(prayer, true, soundType);
+          const id = await scheduleAthanNotification(prayer, true, soundType, language);
           if (id) scheduledCount += 1;
         }
       }
     }
 
     if (requestId !== latestSchedulingRequest) return;
-    await scheduleRenewalReminder(today);
+    await scheduleRenewalReminder(today, language);
 
     console.log(`[Notifications] Scheduled ${scheduledCount} Athan alerts across ${NOTIFICATION_SCHEDULE_DAYS} days plus renewal reminder`);
   });
@@ -285,12 +289,13 @@ export async function scheduleAllNotifications(
   await schedulingTask;
 }
 
-export async function showLocationUpdatedNotification(locationName: string): Promise<void> {
+export async function showLocationUpdatedNotification(locationName: string, language?: AppLanguage): Promise<void> {
   if (Platform.OS === 'web') return;
+  language ??= await getStoredLanguage();
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'أذان السليماني',
-      body: `نوّرت ${locationName} 🤍، وتم تحديث مواقيت الصلاة حسب موقعك الحالي.`,
+      title: translate(language, 'appName'),
+      body: translate(language, 'locationUpdated', { location: locationName }),
       sound: true,
       data: { type: 'location-updated', locationName },
     },

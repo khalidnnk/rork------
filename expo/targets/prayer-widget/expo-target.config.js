@@ -12,6 +12,7 @@ module.exports = (config) => ({
   },
   images: {
     appIcon: '../../assets/images/icon.png',
+    widgetBackground: '../../assets/images/bg-phone.png',
   },
   entitlements: {
     'com.apple.security.application-groups':

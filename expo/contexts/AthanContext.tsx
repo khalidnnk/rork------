@@ -28,6 +28,7 @@ import {
   stopBackgroundLocationUpdates,
 } from '@/utils/backgroundLocation';
 import { publishWidgetData } from '@/utils/widgetData';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 
 const STORAGE_KEY = ATHAN_SETTINGS_STORAGE_KEY;
@@ -105,6 +106,7 @@ async function saveSettings(settings: AthanSettings): Promise<AthanSettings> {
 
 export const [AthanProvider, useAthan] = createContextHook(() => {
   const queryClient = useQueryClient();
+  const { language, t } = useLanguage();
   const [settings, setSettings] = useState<AthanSettings>(DEFAULT_SETTINGS);
   const [locationLoading, setLocationLoading] = useState<boolean>(false);
   const [isAdhanPlaying, setIsAdhanPlaying] = useState<boolean>(false);
@@ -380,8 +382,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         if (Platform.OS !== 'web') {
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: 'معاينة صوت التنبيه',
-              body: 'هذا هو صوت التنبيه الافتراضي',
+              title: t('previewTitle'),
+              body: t('previewBody'),
               sound: 'default',
             },
             trigger: null,
@@ -397,7 +399,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       setIsPreviewPlaying(false);
       setPreviewingSoundType(null);
     }
-  }, [player, isPreviewPlaying, isAdhanPlaying, getSourceForType, getBundledSourceForType, waitForLoaded]);
+  }, [player, isPreviewPlaying, isAdhanPlaying, getSourceForType, getBundledSourceForType, waitForLoaded, t]);
 
   const stopPreview = useCallback(() => {
     console.log('[AthanContext] Stopping preview');
@@ -578,7 +580,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       const lng = loc.coords.longitude;
       const tz = getTimezoneOffset();
 
-      const locationName = await resolveLocationName(lat, lng);
+      const locationName = await resolveLocationName(lat, lng, language);
 
       updateSettings({
         latitude: lat,
@@ -590,7 +592,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     } catch (e) {
       console.error('[AthanContext] Silent location error:', e);
     }
-  }, [updateSettings]);
+  }, [updateSettings, language]);
 
   // Automatic is the default mode. It remains active across launches until
   // the user explicitly chooses a city, which switches locationMode to manual.
@@ -649,7 +651,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       const lng = loc.coords.longitude;
       const tz = getTimezoneOffset();
 
-      const locationName = await resolveLocationName(lat, lng);
+      const locationName = await resolveLocationName(lat, lng, language);
 
       updateSettings({
         latitude: lat,
@@ -663,7 +665,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.error('[AthanContext] Location error:', e);
       setLocationLoading(false);
     }
-  }, [updateSettings]);
+  }, [updateSettings, language]);
 
   const setBackgroundLocationEnabled = useCallback(async (enabled: boolean): Promise<boolean> => {
     if (Platform.OS === 'web') return false;
@@ -740,8 +742,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [recalculatePrayers, dateKey]);
 
   useEffect(() => {
-    publishWidgetData(settings);
-  }, [settings]);
+    publishWidgetData(settings, language);
+  }, [settings, language]);
 
   useEffect(() => {
     const updateNextPrayer = () => {
@@ -809,14 +811,14 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
 
     async function scheduleNotifs() {
-      const granted = await requestNotificationPermissions();
+      const granted = await requestNotificationPermissions(language);
       if (granted) {
-        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets);
+        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, language);
       }
     }
 
     void scheduleNotifs();
-  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets]);
+  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, language]);
 
   return useMemo(() => ({
     settings,

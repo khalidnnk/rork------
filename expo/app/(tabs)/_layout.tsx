@@ -6,13 +6,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 function SingleDestinationTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const isSettings = state.routes[state.index]?.name === 'settings';
   const targetName = isSettings ? '(home)' : 'settings';
   const targetRoute = state.routes.find((route) => route.name === targetName);
-  const label = isSettings ? 'المواقيت' : 'الإعدادات';
+  const label = isSettings ? t('prayerTimes') : t('settings');
   const Icon = isSettings ? Home : Settings;
 
   const handlePress = () => {
@@ -33,7 +35,7 @@ function SingleDestinationTabBar({ state, navigation }: BottomTabBarProps) {
       <Pressable
         onPress={handlePress}
         accessibilityRole="button"
-        accessibilityLabel={isSettings ? 'العودة إلى صفحة المواقيت' : 'فتح الإعدادات'}
+        accessibilityLabel={isSettings ? t('backPrayerTimes') : t('openSettings')}
         testID={isSettings ? 'go-to-prayer-times' : 'go-to-settings'}
         style={({ pressed }) => [styles.destinationButton, pressed && styles.destinationButtonPressed]}
       >
@@ -45,6 +47,7 @@ function SingleDestinationTabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 export default function TabLayout() {
+  const { t } = useLanguage();
   return (
     <Tabs
       backBehavior="history"
@@ -56,14 +59,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="(home)"
         options={{
-          title: 'المواقيت',
+          title: t('prayerTimes'),
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'الإعدادات',
+          title: t('settings'),
           tabBarIcon: ({ color, size }) => <Settings size={size} color={color} />,
         }}
       />
