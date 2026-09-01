@@ -1,10 +1,11 @@
 import SwiftUI
+import UIKit
 import WidgetKit
 
 private let appGroup = "group.app.alsulaimani.athan"
 private let widgetKind = "AlsulaimaniPrayerWidget"
 
-private struct SharedPrayer {
+private struct SharedPrayer: Codable {
     let name: String
     let labelAr: String
     let time: Double
@@ -17,6 +18,14 @@ private struct PrayerEntry: TimelineEntry {
     let locationNameEn: String
     let appLanguage: String?
     let prayer: SharedPrayer?
+    let isPlaceholder: Bool
+}
+
+private struct SharedState {
+    let locationNameAr: String
+    let locationNameEn: String
+    let appLanguage: String?
+    let prayers: [SharedPrayer]
 }
 
 private struct PrayerProvider: TimelineProvider {
@@ -26,61 +35,139 @@ private struct PrayerProvider: TimelineProvider {
             locationNameAr: "موقعك الحالي",
             locationNameEn: "Current location",
             appLanguage: nil,
-            prayer: SharedPrayer(name: "asr", labelAr: "العصر", time: Date().addingTimeInterval(3600).timeIntervalSince1970, timeText: "3:41 PM")
+            prayer: SharedPrayer(
+                name: "asr",
+                labelAr: "العصر",
+                time: Date().addingTimeInterval(3600).timeIntervalSince1970,
+                timeText: "3:41 PM"
+            ),
+            isPlaceholder: true
         )
     }
 
     func getSnapshot(in context: Context, completion: @escaping (PrayerEntry) -> Void) {
-        completion(context.isPreview ? placeholder(in: context) : loadEntry())
+        if context.isPreview {
+            completion(placeholder(in: context))
+            return
+        }
+        completion(makeEntries().first ?? fallbackEntry())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<PrayerEntry>) -> Void) {
-        let entry = loadEntry()
-        let nextRefresh = entry.prayer.map {
-            let prayerRefresh = Date(timeIntervalSince1970: $0.time).addingTimeInterval(30)
-            return max(Date().addingTimeInterval(60), min(prayerRefresh, Date().addingTimeInterval(15 * 60)))
-        } ?? Date().addingTimeInterval(15 * 60)
-        completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
+        let entries = makeEntries()
+        let refreshDate: Date
+
+        if let lastPrayerTime = entries.last?.prayer?.time {
+            refreshDate = max(
+                Date().addingTimeInterval(60),
+                Date(timeIntervalSince1970: lastPrayerTime).addingTimeInterval(60)
+            )
+        } else {
+            refreshDate = Date().addingTimeInterval(15 * 60)
+        }
+
+        completion(Timeline(entries: entries, policy: .after(refreshDate)))
     }
 
-    private func loadEntry() -> PrayerEntry {
+    private func makeEntries() -> [PrayerEntry] {
+        let state = loadState()
+        let prayers = Array(state.prayers.prefix(50))
+
+        guard !prayers.isEmpty else {
+            return [PrayerEntry(
+                date: Date(),
+                locationNameAr: state.locationNameAr,
+                locationNameEn: state.locationNameEn,
+                appLanguage: state.appLanguage,
+                prayer: nil,
+                isPlaceholder: false
+            )]
+        }
+
+        return prayers.enumerated().map { index, prayer in
+            let entryDate: Date
+            if index == 0 {
+                entryDate = Date()
+            } else {
+                entryDate = Date(timeIntervalSince1970: prayers[index - 1].time + 1)
+            }
+
+            return PrayerEntry(
+                date: entryDate,
+                locationNameAr: state.locationNameAr,
+                locationNameEn: state.locationNameEn,
+                appLanguage: state.appLanguage,
+                prayer: prayer,
+                isPlaceholder: false
+            )
+        }
+    }
+
+    private func loadState() -> SharedState {
         let defaults = UserDefaults(suiteName: appGroup)
         let legacyLocationName = defaults?.string(forKey: "locationName") ?? "موقعك الحالي"
         let locationNameAr = defaults?.string(forKey: "locationNameAr") ?? legacyLocationName
         let locationNameEn = defaults?.string(forKey: "locationNameEn") ?? legacyLocationName
+        let appLanguage = defaults?.string(forKey: "appLanguage")
         let now = Date().timeIntervalSince1970
-        let nextPrayer: SharedPrayer?
+        var prayers: [SharedPrayer] = []
+
         if defaults?.integer(forKey: "widgetDataReady") == 1,
+           let scheduleData = defaults?.data(forKey: "prayerSchedule"),
+           let decodedSchedule = try? JSONDecoder().decode([SharedPrayer].self, from: scheduleData) {
+            prayers = decodedSchedule
+                .filter { $0.time > now }
+                .sorted { $0.time < $1.time }
+        }
+
+        // Backward-compatible fallback for users upgrading from older builds.
+        if prayers.isEmpty,
+           defaults?.integer(forKey: "widgetDataReady") == 1,
            let name = defaults?.string(forKey: "nextPrayerName"),
            let labelAr = defaults?.string(forKey: "nextPrayerLabelAr"),
            let timeText = defaults?.string(forKey: "nextPrayerTimeText"),
            let storedTime = defaults?.object(forKey: "nextPrayerTime") as? NSNumber,
            storedTime.doubleValue > now {
-            nextPrayer = SharedPrayer(
+            prayers = [SharedPrayer(
                 name: name,
                 labelAr: labelAr,
                 time: storedTime.doubleValue,
                 timeText: timeText
-            )
-        } else {
-            nextPrayer = nil
+            )]
         }
-        let appLanguage = defaults?.string(forKey: "appLanguage")
-        return PrayerEntry(date: Date(), locationNameAr: locationNameAr, locationNameEn: locationNameEn, appLanguage: appLanguage, prayer: nextPrayer)
+
+        return SharedState(
+            locationNameAr: locationNameAr,
+            locationNameEn: locationNameEn,
+            appLanguage: appLanguage,
+            prayers: prayers
+        )
+    }
+
+    private func fallbackEntry() -> PrayerEntry {
+        PrayerEntry(
+            date: Date(),
+            locationNameAr: "موقعك الحالي",
+            locationNameEn: "Current location",
+            appLanguage: nil,
+            prayer: nil,
+            isPlaceholder: false
+        )
     }
 }
 
 private struct WidgetBackgroundModifier: ViewModifier {
     let family: WidgetFamily
+    let showsImage: Bool
 
     func body(content: Content) -> some View {
         if #available(iOSApplicationExtension 17.0, *) {
             content.containerBackground(for: .widget) {
-                WidgetBackground(family: family)
+                WidgetBackground(family: family, showsImage: showsImage)
             }
         } else {
             content.background {
-                WidgetBackground(family: family)
+                WidgetBackground(family: family, showsImage: showsImage)
             }
         }
     }
@@ -88,14 +175,27 @@ private struct WidgetBackgroundModifier: ViewModifier {
 
 private struct WidgetBackground: View {
     let family: WidgetFamily
+    let showsImage: Bool
+
+    // Widget extensions have a strict memory budget. Decode the original app
+    // background once into a widget-sized bitmap instead of retaining the
+    // full-resolution phone artwork in every timeline render.
+    private static let thumbnail: UIImage? = {
+        guard let source = UIImage(named: "widgetBackground") else { return nil }
+        return source.preparingThumbnail(of: CGSize(width: 700, height: 700))
+    }()
 
     var body: some View {
         ZStack {
-            Image("widgetBackground")
-                .resizable()
-                .scaledToFill()
-                .scaleEffect(family == .systemMedium ? 1.08 : 1.0)
-                .offset(y: family == .systemMedium ? 30 : 5)
+            Color(red: 11.0/255.0, green: 26.0/255.0, blue: 31.0/255.0)
+
+            if showsImage, let image = Self.thumbnail {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .scaleEffect(family == .systemMedium ? 1.08 : 1.0)
+                    .offset(y: family == .systemMedium ? 30 : 5)
+            }
 
             LinearGradient(
                 colors: [
@@ -152,7 +252,7 @@ private struct PrayerWidgetView: View {
             }
         }
         .padding(14)
-        .modifier(WidgetBackgroundModifier(family: family))
+        .modifier(WidgetBackgroundModifier(family: family, showsImage: !entry.isPlaceholder))
     }
 
     private var locationHeader: some View {
