@@ -5,7 +5,7 @@ module.exports = (config) => ({
   displayName: 'أذان السليماني',
   bundleIdentifier: '.prayerwidget',
   deploymentTarget: '16.0',
-  frameworks: ['SwiftUI', 'WidgetKit'],
+  frameworks: ['SwiftUI', 'UIKit', 'WidgetKit'],
   colors: {
     $accent: '#C9A84C',
     $widgetBackground: '#0B1A1F',
