@@ -1,8 +1,6 @@
-name: Distribute iOS 1.0.0 (32) to TestFlight
+name: Distribute iOS 1.0.0 (32) to TestFlight (paused)
 
-on:
-  push:
-    branches: ['feature/v1.3.4-location-widget-ui']
+# Trigger disabled after the one-time direct TestFlight request.
 
 jobs:
   find_build_32:
