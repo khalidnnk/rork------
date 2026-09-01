@@ -5,7 +5,6 @@ import { ALL_CITIES } from '@/constants/cities';
 import type { AppLanguage } from '@/utils/i18n';
 
 const APP_GROUP = 'group.app.alsulaimani.athan';
-const WIDGET_KIND = 'AlsulaimaniPrayerWidget';
 let publishGeneration = 0;
 
 export function publishWidgetData(settings: AthanSettings, language?: AppLanguage): void {
@@ -45,8 +44,8 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
       locationName: settings.locationName,
       locationNameAr: city?.nameAr ?? settings.locationName,
       locationNameEn: city?.name ?? settings.locationName,
-      prayersJSON: JSON.stringify(prayers),
-      lastUpdated: Date.now() / 1000,
+      prayers,
+      lastUpdated: Math.floor(Date.now() / 1000),
     };
 
     const writeAndReload = () => {
@@ -56,9 +55,11 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
       storage.set('locationNameAr', values.locationNameAr);
       storage.set('locationNameEn', values.locationNameEn);
       if (language) storage.set('appLanguage', language);
-      storage.set('prayersJSON', values.prayersJSON);
+      // Arrays are stored by the native module as Data in the App Group.
+      // Reading that Data directly in Swift avoids string/JSON bridging issues.
+      storage.set('prayersData', values.prayers);
       storage.set('lastUpdated', values.lastUpdated);
-      ExtensionStorage.reloadWidget(WIDGET_KIND);
+      ExtensionStorage.reloadWidget();
     };
 
     // App Group UserDefaults are shared across two processes. Reload once
