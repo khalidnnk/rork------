@@ -11,7 +11,6 @@ module.exports = (config) => ({
     $widgetBackground: '#0B1A1F',
   },
   images: {
-    appIcon: '../../assets/images/icon.png',
     widgetBackground: '../../assets/images/bg-phone.png',
   },
   entitlements: {
