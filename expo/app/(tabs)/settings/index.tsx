@@ -215,7 +215,6 @@ export default function SettingsScreen() {
   const { preference, setPreference, language, t } = useLanguage();
   const prayerLabel = useCallback((name: PrayerName) => t(name), [t]);
   const soundOptions: { key: NotificationSoundType; label: string; description: string }[] = [
-    { key: 'full_athan', label: t('fullAthan'), description: t('fullAthanDescription') },
     { key: 'athan', label: t('haya'), description: t('hayaDescription') },
     { key: 'allahu_akbar', label: t('allahuAkbar'), description: t('allahuAkbarDescription') },
     { key: 'default', label: t('systemSound'), description: t('systemSoundDescription') },
