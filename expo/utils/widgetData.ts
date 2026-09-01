@@ -40,11 +40,14 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
       item.name === settings.locationName || item.nameAr === settings.locationName ||
       (Math.abs(item.latitude - settings.latitude) < 0.002 && Math.abs(item.longitude - settings.longitude) < 0.002)
     );
+    const nowSeconds = Date.now() / 1000;
+    const nextPrayer = prayers.find((prayer) => Number(prayer.time) > nowSeconds);
     const values = {
       locationName: settings.locationName,
       locationNameAr: city?.nameAr ?? settings.locationName,
       locationNameEn: city?.name ?? settings.locationName,
       prayers,
+      nextPrayer,
       lastUpdated: Math.floor(Date.now() / 1000),
     };
 
@@ -55,9 +58,17 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
       storage.set('locationNameAr', values.locationNameAr);
       storage.set('locationNameEn', values.locationNameEn);
       if (language) storage.set('appLanguage', language);
-      // Arrays are stored by the native module as Data in the App Group.
-      // Reading that Data directly in Swift avoids string/JSON bridging issues.
+      // Keep the full array for forward compatibility, but also publish the
+      // next prayer as primitive values. Primitive UserDefaults values bridge
+      // reliably between React Native and WidgetKit on physical devices.
       storage.set('prayersData', values.prayers);
+      if (values.nextPrayer) {
+        storage.set('nextPrayerName', String(values.nextPrayer.name));
+        storage.set('nextPrayerLabelAr', String(values.nextPrayer.labelAr));
+        storage.set('nextPrayerTime', Number(values.nextPrayer.time));
+        storage.set('nextPrayerTimeText', String(values.nextPrayer.timeText));
+      }
+      storage.set('widgetDataReady', 1);
       storage.set('lastUpdated', values.lastUpdated);
       ExtensionStorage.reloadWidget();
     };
