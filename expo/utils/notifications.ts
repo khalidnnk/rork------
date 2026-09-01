@@ -25,7 +25,9 @@ function getNotificationSound(soundType: NotificationSoundType): boolean | strin
     case 'athan':
       return 'haya_ala_salah.m4a';
     case 'full_athan':
-      return 'athan.m4a';
+      // Backward-compatible fallback for users upgrading from a build where
+      // Full Athan was selectable as an alert sound.
+      return 'haya_ala_salah.m4a';
     case 'allahu_akbar':
       return 'allahu_akbar.m4a';
     case 'default':
@@ -40,7 +42,7 @@ function getIOSNotificationCategory(soundType: NotificationSoundType): string {
     case 'athan':
       return 'athan_haya';
     case 'full_athan':
-      return 'athan_full';
+      return 'athan_haya';
     case 'allahu_akbar':
       return 'athan_akbar';
     default:
@@ -51,17 +53,6 @@ function getIOSNotificationCategory(soundType: NotificationSoundType): string {
 async function setupNotificationCategories(language: AppLanguage): Promise<void> {
   if (Platform.OS !== 'ios') return;
   try {
-    await Notifications.setNotificationCategoryAsync('athan_full', [
-      {
-        identifier: 'OPEN_ATHAN',
-        buttonTitle: translate(language, 'listenFullAthan'),
-        options: {
-          opensAppToForeground: true,
-        },
-      },
-    ], {
-      allowInCarPlay: true,
-    });
     await Notifications.setNotificationCategoryAsync('athan_haya', [
       {
         identifier: 'OPEN_ATHAN',
@@ -167,9 +158,7 @@ export async function scheduleAthanNotification(
 
     const notificationContent: Notifications.NotificationContentInput = {
       title: translate(language, 'prayerTimeTitle', { prayer: language === 'ar' ? prayer.labelAr : prayer.label }),
-      body: soundType === 'full_athan'
-        ? translate(language, 'fullAthanBody', { prayer: language === 'ar' ? prayer.labelAr : prayer.label, time: prayer.timeStr })
-        : translate(language, 'prayerBody', { prayer: language === 'ar' ? prayer.labelAr : prayer.label, time: prayer.timeStr }),
+      body: translate(language, 'prayerBody', { prayer: language === 'ar' ? prayer.labelAr : prayer.label, time: prayer.timeStr }),
       sound: sound,
       data: { prayerName: prayer.name, time: prayer.timeStr, soundType },
     };
