@@ -276,7 +276,7 @@ export default function SettingsScreen() {
     void detectAutoLocation();
   }, [detectAutoLocation]);
 
-  const handleBackgroundLocationToggle = useCallback(async (enabled: boolean) => {
+  const applyBackgroundLocationToggle = useCallback(async (enabled: boolean) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const granted = await setBackgroundLocationEnabled(enabled);
@@ -294,6 +294,25 @@ export default function SettingsScreen() {
       Alert.alert(t('autoUpdateFailed'), t('checkLocationPermission'));
     }
   }, [detectAutoLocation, setBackgroundLocationEnabled, t]);
+
+  const handleBackgroundLocationToggle = useCallback((enabled: boolean) => {
+    if (!enabled) {
+      void applyBackgroundLocationToggle(false);
+      return;
+    }
+
+    Alert.alert(
+      t('backgroundLocationDisclosureTitle'),
+      t('backgroundLocationDisclosureMessage'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('continueEnable'),
+          onPress: () => void applyBackgroundLocationToggle(true),
+        },
+      ]
+    );
+  }, [applyBackgroundLocationToggle, t]);
 
   const handleSoundChange = useCallback(
     (sound: NotificationSoundType) => {
