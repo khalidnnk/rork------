@@ -84,7 +84,6 @@
         {
           "sounds": [
             "./assets/audio/haya_ala_salah.m4a",
-            "./assets/audio/athan.m4a",
             "./assets/audio/allahu_akbar.m4a"
           ]
         }
