@@ -17,6 +17,7 @@ private struct PrayerEntry: TimelineEntry {
     let locationNameAr: String
     let locationNameEn: String
     let appLanguage: String?
+    let alwaysLocationEnabled: Bool
     let prayer: SharedPrayer?
     let isPlaceholder: Bool
 }
@@ -25,6 +26,7 @@ private struct SharedState {
     let locationNameAr: String
     let locationNameEn: String
     let appLanguage: String?
+    let alwaysLocationEnabled: Bool
     let prayers: [SharedPrayer]
 }
 
@@ -35,6 +37,7 @@ private struct PrayerProvider: TimelineProvider {
             locationNameAr: "موقعك الحالي",
             locationNameEn: "Current location",
             appLanguage: nil,
+            alwaysLocationEnabled: false,
             prayer: SharedPrayer(
                 name: "asr",
                 labelAr: "العصر",
@@ -79,6 +82,7 @@ private struct PrayerProvider: TimelineProvider {
                 locationNameAr: state.locationNameAr,
                 locationNameEn: state.locationNameEn,
                 appLanguage: state.appLanguage,
+                alwaysLocationEnabled: state.alwaysLocationEnabled,
                 prayer: nil,
                 isPlaceholder: false
             )]
@@ -97,6 +101,7 @@ private struct PrayerProvider: TimelineProvider {
                 locationNameAr: state.locationNameAr,
                 locationNameEn: state.locationNameEn,
                 appLanguage: state.appLanguage,
+                alwaysLocationEnabled: state.alwaysLocationEnabled,
                 prayer: prayer,
                 isPlaceholder: false
             )
@@ -109,6 +114,7 @@ private struct PrayerProvider: TimelineProvider {
         let locationNameAr = defaults?.string(forKey: "locationNameAr") ?? legacyLocationName
         let locationNameEn = defaults?.string(forKey: "locationNameEn") ?? legacyLocationName
         let appLanguage = defaults?.string(forKey: "appLanguage")
+        let alwaysLocationEnabled = defaults?.integer(forKey: "alwaysLocationEnabled") == 1
         let now = Date().timeIntervalSince1970
         var prayers: [SharedPrayer] = []
 
@@ -140,6 +146,7 @@ private struct PrayerProvider: TimelineProvider {
             locationNameAr: locationNameAr,
             locationNameEn: locationNameEn,
             appLanguage: appLanguage,
+            alwaysLocationEnabled: alwaysLocationEnabled,
             prayers: prayers
         )
     }
@@ -150,6 +157,7 @@ private struct PrayerProvider: TimelineProvider {
             locationNameAr: "موقعك الحالي",
             locationNameEn: "Current location",
             appLanguage: nil,
+            alwaysLocationEnabled: false,
             prayer: nil,
             isPlaceholder: false
         )
@@ -273,18 +281,25 @@ private struct PrayerWidgetView: View {
 
     private var smallWidget: some View {
         VStack(spacing: 5) {
-            HStack(spacing: 5) {
-                locationHeader
+            HStack {
+                Spacer(minLength: 0)
 
-                Link(destination: URL(string: "alsulaimani-athan://refresh-location")!) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(lightGold)
+                if entry.alwaysLocationEnabled {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(gold)
                         .frame(width: 30, height: 30)
-                        .background(gold.opacity(0.16), in: Circle())
-                        .padding(7)
+                        .accessibilityLabel(isArabic ? "الموقع يعمل دائمًا" : "Always-on location enabled")
+                } else {
+                    Link(destination: URL(string: "alsulaimani-athan://refresh-location")!) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(lightGold)
+                            .frame(width: 30, height: 30)
+                            .background(gold.opacity(0.16), in: Circle())
+                    }
+                    .accessibilityLabel(refreshLabel)
                 }
-                .accessibilityLabel(refreshLabel)
 
                 Spacer(minLength: 0)
             }
@@ -352,15 +367,17 @@ private struct PrayerWidgetView: View {
 
             Spacer(minLength: 0)
 
-            Link(destination: URL(string: "alsulaimani-athan://refresh-location")!) {
-                Label(refreshLabel, systemImage: "location.circle.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(lightGold)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background(gold.opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
+            if !entry.alwaysLocationEnabled {
+                Link(destination: URL(string: "alsulaimani-athan://refresh-location")!) {
+                    Label(refreshLabel, systemImage: "location.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(lightGold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(gold.opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
+                }
+                .accessibilityLabel(refreshLabel)
             }
-            .accessibilityLabel(refreshLabel)
         }
     }
 }
