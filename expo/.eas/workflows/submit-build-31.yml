@@ -1,0 +1,13 @@
+name: Submit iOS build 31
+
+on:
+  push:
+    branches: ['feature/v1.3.4-location-widget-ui']
+
+jobs:
+  submit_ios:
+    name: Upload build 31 to App Store Connect
+    type: submit
+    params:
+      build_id: 7b6913ff-eb19-4d25-abf5-11eeaf7d0de3
+      profile: production
