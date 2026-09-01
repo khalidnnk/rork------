@@ -47,8 +47,15 @@ private struct PrayerProvider: TimelineProvider {
         let legacyLocationName = defaults?.string(forKey: "locationName") ?? "موقعك الحالي"
         let locationNameAr = defaults?.string(forKey: "locationNameAr") ?? legacyLocationName
         let locationNameEn = defaults?.string(forKey: "locationNameEn") ?? legacyLocationName
-        let prayersJSON = defaults?.string(forKey: "prayersJSON") ?? "[]"
-        let prayers = (try? JSONDecoder().decode([SharedPrayer].self, from: Data(prayersJSON.utf8))) ?? []
+        let prayers: [SharedPrayer]
+        if let prayersData = defaults?.data(forKey: "prayersData"),
+           let decoded = try? JSONDecoder().decode([SharedPrayer].self, from: prayersData) {
+            prayers = decoded
+        } else {
+            // Keep compatibility with widgets populated by older app builds.
+            let prayersJSON = defaults?.string(forKey: "prayersJSON") ?? "[]"
+            prayers = (try? JSONDecoder().decode([SharedPrayer].self, from: Data(prayersJSON.utf8))) ?? []
+        }
         let now = Date().timeIntervalSince1970
         let nextPrayer = prayers.first(where: { $0.time > now })
         let appLanguage = defaults?.string(forKey: "appLanguage")
