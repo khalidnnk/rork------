@@ -86,6 +86,11 @@ async function loadSettings(): Promise<AthanSettings> {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
+      // Full Athan remains available inside the app, but it is no longer an
+      // alert-sound option because iOS notification sounds must be short.
+      if (parsed.notificationSound === 'full_athan') {
+        parsed.notificationSound = 'athan';
+      }
       return { ...DEFAULT_SETTINGS, ...parsed };
     }
   } catch (e) {
@@ -525,7 +530,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
   const setLocation = useCallback(
     (latitude: number, longitude: number, locationName: string, timezone: number) => {
-      console.log('[AthanContext] Setting location:', locationName, latitude, longitude);
       updateSettings({
         latitude,
         longitude,
@@ -724,7 +728,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const recalculatePrayers = useCallback(() => {
     const systemTz = getTimezoneOffset();
     const now = new Date();
-    console.log('[AthanContext] Recalculating prayer times | lat:', settings.latitude, 'lng:', settings.longitude, 'tz:', systemTz);
     const prayers = calculatePrayerTimes(
       now,
       settings.latitude,
@@ -742,8 +745,9 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [recalculatePrayers, dateKey]);
 
   useEffect(() => {
+    if (settingsQuery.isLoading) return;
     publishWidgetData(settings, language);
-  }, [settings, language]);
+  }, [settings, language, settingsQuery.isLoading]);
 
   useEffect(() => {
     const updateNextPrayer = () => {
@@ -786,6 +790,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         console.log('[AthanContext] App became active, refreshing prayer times');
         void loadSettings().then((storedSettings) => {
           setSettings(storedSettings);
+          publishWidgetData(storedSettings, language);
           setDailyPrayers(calculatePrayerTimes(
             new Date(),
             storedSettings.latitude,
@@ -800,7 +805,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       }
     });
     return () => subscription.remove();
-  }, [detectAutoLocationSilent]);
+  }, [detectAutoLocationSilent, language]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
