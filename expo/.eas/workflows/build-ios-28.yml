@@ -1,8 +1,6 @@
-name: Build iOS 1.0.0 (28)
+name: Build iOS 1.0.0 (28) (disabled)
 
-on:
-  push:
-    branches: ['feature/v1.3.4-location-widget-ui']
+# Retained for build history only. No automatic trigger.
 
 jobs:
   build_ios:
