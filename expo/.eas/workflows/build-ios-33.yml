@@ -1,8 +1,6 @@
-name: Build iOS 1.0.0 (33)
+name: Build iOS 1.0.0 (33) (paused)
 
-on:
-  push:
-    branches: ['feature/v1.3.4-location-widget-ui']
+# Trigger disabled after Build 33 was requested to prevent duplicate builds.
 
 jobs:
   build_ios:
