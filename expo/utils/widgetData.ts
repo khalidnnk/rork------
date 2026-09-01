@@ -6,13 +6,14 @@ import type { AppLanguage } from '@/utils/i18n';
 
 const APP_GROUP = 'group.app.alsulaimani.athan';
 const WIDGET_KIND = 'AlsulaimaniPrayerWidget';
+let publishGeneration = 0;
 
 export function publishWidgetData(settings: AthanSettings, language?: AppLanguage): void {
   if (Platform.OS !== 'ios') return;
+  const generation = ++publishGeneration;
 
   try {
     const { ExtensionStorage } = require('@bacons/apple-targets') as typeof import('@bacons/apple-targets');
-    const storage = new ExtensionStorage(APP_GROUP);
     const prayers: Array<Record<string, string | number>> = [];
     const today = new Date();
 
@@ -40,13 +41,32 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
       item.name === settings.locationName || item.nameAr === settings.locationName ||
       (Math.abs(item.latitude - settings.latitude) < 0.002 && Math.abs(item.longitude - settings.longitude) < 0.002)
     );
-    storage.set('locationName', settings.locationName);
-    storage.set('locationNameAr', city?.nameAr ?? settings.locationName);
-    storage.set('locationNameEn', city?.name ?? settings.locationName);
-    if (language) storage.set('appLanguage', language);
-    storage.set('prayersJSON', JSON.stringify(prayers));
-    storage.set('lastUpdated', Date.now() / 1000);
-    ExtensionStorage.reloadWidget(WIDGET_KIND);
+    const values = {
+      locationName: settings.locationName,
+      locationNameAr: city?.nameAr ?? settings.locationName,
+      locationNameEn: city?.name ?? settings.locationName,
+      prayersJSON: JSON.stringify(prayers),
+      lastUpdated: Date.now() / 1000,
+    };
+
+    const writeAndReload = () => {
+      if (generation !== publishGeneration) return;
+      const storage = new ExtensionStorage(APP_GROUP);
+      storage.set('locationName', values.locationName);
+      storage.set('locationNameAr', values.locationNameAr);
+      storage.set('locationNameEn', values.locationNameEn);
+      if (language) storage.set('appLanguage', language);
+      storage.set('prayersJSON', values.prayersJSON);
+      storage.set('lastUpdated', values.lastUpdated);
+      ExtensionStorage.reloadWidget(WIDGET_KIND);
+    };
+
+    // App Group UserDefaults are shared across two processes. Reload once
+    // immediately, then repeat after the values have had time to propagate so
+    // a newly installed/re-added widget cannot remain on its placeholder.
+    writeAndReload();
+    setTimeout(writeAndReload, 750);
+    setTimeout(writeAndReload, 2_500);
   } catch (error) {
     console.error('[WidgetData] Failed to update widget:', error);
   }
