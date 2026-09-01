@@ -47,17 +47,42 @@ private struct PrayerProvider: TimelineProvider {
         let legacyLocationName = defaults?.string(forKey: "locationName") ?? "موقعك الحالي"
         let locationNameAr = defaults?.string(forKey: "locationNameAr") ?? legacyLocationName
         let locationNameEn = defaults?.string(forKey: "locationNameEn") ?? legacyLocationName
-        let prayers: [SharedPrayer]
-        if let prayersData = defaults?.data(forKey: "prayersData"),
-           let decoded = try? JSONDecoder().decode([SharedPrayer].self, from: prayersData) {
-            prayers = decoded
-        } else {
-            // Keep compatibility with widgets populated by older app builds.
-            let prayersJSON = defaults?.string(forKey: "prayersJSON") ?? "[]"
-            prayers = (try? JSONDecoder().decode([SharedPrayer].self, from: Data(prayersJSON.utf8))) ?? []
-        }
         let now = Date().timeIntervalSince1970
-        let nextPrayer = prayers.first(where: { $0.time > now })
+        var nextPrayer: SharedPrayer?
+
+        // Prefer primitive values. They are the most reliable bridge between
+        // the React Native process and the WidgetKit extension.
+        if defaults?.integer(forKey: "widgetDataReady") == 1,
+           let name = defaults?.string(forKey: "nextPrayerName"),
+           let labelAr = defaults?.string(forKey: "nextPrayerLabelAr"),
+           let timeText = defaults?.string(forKey: "nextPrayerTimeText") {
+            let time = defaults?.double(forKey: "nextPrayerTime") ?? 0
+            if time > now {
+                nextPrayer = SharedPrayer(name: name, labelAr: labelAr, time: time, timeText: timeText)
+            }
+        }
+
+        // Compatibility with older builds that published an array or JSON.
+        if nextPrayer == nil,
+           let rawPrayers = defaults?.array(forKey: "prayersData") as? [[String: Any]] {
+            let prayers = rawPrayers.compactMap { item -> SharedPrayer? in
+                guard let name = item["name"] as? String,
+                      let labelAr = item["labelAr"] as? String,
+                      let timeText = item["timeText"] as? String,
+                      let time = (item["time"] as? NSNumber)?.doubleValue else {
+                    return nil
+                }
+                return SharedPrayer(name: name, labelAr: labelAr, time: time, timeText: timeText)
+            }
+            nextPrayer = prayers.first(where: { $0.time > now })
+        }
+
+        if nextPrayer == nil {
+            let prayersJSON = defaults?.string(forKey: "prayersJSON") ?? "[]"
+            let prayers = (try? JSONDecoder().decode([SharedPrayer].self, from: Data(prayersJSON.utf8))) ?? []
+            nextPrayer = prayers.first(where: { $0.time > now })
+        }
+
         let appLanguage = defaults?.string(forKey: "appLanguage")
         return PrayerEntry(date: Date(), locationNameAr: locationNameAr, locationNameEn: locationNameEn, appLanguage: appLanguage, prayer: nextPrayer)
     }
