@@ -1,0 +1,28 @@
+name: Distribute iOS 1.0.0 (32) to TestFlight
+
+on:
+  push:
+    branches: ['feature/v1.3.4-location-widget-ui']
+
+jobs:
+  find_build_32:
+    name: Find finished iOS 1.0.0 (32)
+    type: get-build
+    params:
+      platform: ios
+      profile: production
+      distribution: store
+      app_identifier: app.rork.alsulaimani-athan
+      app_version: "1.0.0"
+      app_build_version: "32"
+      wait_for_in_progress: true
+
+  testflight_distribution:
+    name: Upload build 32 to TestFlight
+    needs: [find_build_32]
+    type: testflight
+    params:
+      build_id: ${{ needs.find_build_32.outputs.build_id }}
+      profile: production
+      submit_beta_review: false
+      wait_processing_timeout_seconds: 1800
