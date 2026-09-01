@@ -85,10 +85,12 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
         storage.set('nextPrayerTime', nextPrayer.time);
         storage.set('nextPrayerTimeText', nextPrayer.timeText);
       } else {
-        storage.remove('nextPrayerName');
-        storage.remove('nextPrayerLabelAr');
-        storage.remove('nextPrayerTime');
-        storage.remove('nextPrayerTimeText');
+        // Avoid stale legacy fallback values without depending on a platform-
+        // specific remove API. Swift rejects a zero timestamp as expired.
+        storage.set('nextPrayerName', '');
+        storage.set('nextPrayerLabelAr', '');
+        storage.set('nextPrayerTime', 0);
+        storage.set('nextPrayerTimeText', '');
       }
 
       storage.set('widgetDataReady', 1);
