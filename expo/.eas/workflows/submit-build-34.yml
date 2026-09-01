@@ -1,0 +1,26 @@
+name: Submit iOS 1.0.0 (34)
+
+on:
+  push:
+    branches: ['feature/v1.3.4-location-widget-ui']
+
+jobs:
+  find_build_34:
+    name: Find finished iOS 1.0.0 (34)
+    type: get-build
+    params:
+      platform: ios
+      profile: production
+      distribution: store
+      app_identifier: app.rork.alsulaimani-athan
+      app_version: "1.0.0"
+      app_build_version: "34"
+      wait_for_in_progress: true
+
+  submit_ios:
+    name: Upload build 34 to App Store Connect
+    needs: [find_build_34]
+    type: submit
+    params:
+      build_id: ${{ needs.find_build_34.outputs.build_id }}
+      profile: production
