@@ -1,6 +1,8 @@
-name: Upload iOS 1.0.0 (32) to TestFlight (paused)
+name: Upload iOS 1.0.0 (32) to TestFlight
 
-# Trigger disabled immediately after the one-time upload workflow was requested.
+on:
+  push:
+    branches: ['feature/v1.3.4-location-widget-ui']
 
 jobs:
   find_build_32:
