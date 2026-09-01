@@ -4,7 +4,7 @@ import WidgetKit
 private let appGroup = "group.app.alsulaimani.athan"
 private let widgetKind = "AlsulaimaniPrayerWidget"
 
-private struct SharedPrayer: Codable {
+private struct SharedPrayer {
     let name: String
     let labelAr: String
     let time: Double
@@ -31,14 +31,15 @@ private struct PrayerProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (PrayerEntry) -> Void) {
-        completion(loadEntry())
+        completion(context.isPreview ? placeholder(in: context) : loadEntry())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<PrayerEntry>) -> Void) {
         let entry = loadEntry()
         let nextRefresh = entry.prayer.map {
-            min(Date(timeIntervalSince1970: $0.time).addingTimeInterval(30), Date().addingTimeInterval(15 * 60))
-        } ?? Date().addingTimeInterval(30)
+            let prayerRefresh = Date(timeIntervalSince1970: $0.time).addingTimeInterval(30)
+            return max(Date().addingTimeInterval(60), min(prayerRefresh, Date().addingTimeInterval(15 * 60)))
+        } ?? Date().addingTimeInterval(15 * 60)
         completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
     }
 
@@ -48,41 +49,22 @@ private struct PrayerProvider: TimelineProvider {
         let locationNameAr = defaults?.string(forKey: "locationNameAr") ?? legacyLocationName
         let locationNameEn = defaults?.string(forKey: "locationNameEn") ?? legacyLocationName
         let now = Date().timeIntervalSince1970
-        var nextPrayer: SharedPrayer?
-
-        // Prefer primitive values. They are the most reliable bridge between
-        // the React Native process and the WidgetKit extension.
+        let nextPrayer: SharedPrayer?
         if defaults?.integer(forKey: "widgetDataReady") == 1,
            let name = defaults?.string(forKey: "nextPrayerName"),
            let labelAr = defaults?.string(forKey: "nextPrayerLabelAr"),
-           let timeText = defaults?.string(forKey: "nextPrayerTimeText") {
-            let time = defaults?.double(forKey: "nextPrayerTime") ?? 0
-            if time > now {
-                nextPrayer = SharedPrayer(name: name, labelAr: labelAr, time: time, timeText: timeText)
-            }
+           let timeText = defaults?.string(forKey: "nextPrayerTimeText"),
+           let storedTime = defaults?.object(forKey: "nextPrayerTime") as? NSNumber,
+           storedTime.doubleValue > now {
+            nextPrayer = SharedPrayer(
+                name: name,
+                labelAr: labelAr,
+                time: storedTime.doubleValue,
+                timeText: timeText
+            )
+        } else {
+            nextPrayer = nil
         }
-
-        // Compatibility with older builds that published an array or JSON.
-        if nextPrayer == nil,
-           let rawPrayers = defaults?.array(forKey: "prayersData") as? [[String: Any]] {
-            let prayers = rawPrayers.compactMap { item -> SharedPrayer? in
-                guard let name = item["name"] as? String,
-                      let labelAr = item["labelAr"] as? String,
-                      let timeText = item["timeText"] as? String,
-                      let time = (item["time"] as? NSNumber)?.doubleValue else {
-                    return nil
-                }
-                return SharedPrayer(name: name, labelAr: labelAr, time: time, timeText: timeText)
-            }
-            nextPrayer = prayers.first(where: { $0.time > now })
-        }
-
-        if nextPrayer == nil {
-            let prayersJSON = defaults?.string(forKey: "prayersJSON") ?? "[]"
-            let prayers = (try? JSONDecoder().decode([SharedPrayer].self, from: Data(prayersJSON.utf8))) ?? []
-            nextPrayer = prayers.first(where: { $0.time > now })
-        }
-
         let appLanguage = defaults?.string(forKey: "appLanguage")
         return PrayerEntry(date: Date(), locationNameAr: locationNameAr, locationNameEn: locationNameEn, appLanguage: appLanguage, prayer: nextPrayer)
     }
@@ -108,25 +90,23 @@ private struct WidgetBackground: View {
     let family: WidgetFamily
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                Image("widgetBackground")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .offset(y: family == .systemMedium ? geometry.size.height * 0.30 : 0)
+        ZStack {
+            Image("widgetBackground")
+                .resizable()
+                .scaledToFill()
+                .scaleEffect(family == .systemMedium ? 1.08 : 1.0)
+                .offset(y: family == .systemMedium ? 30 : 5)
 
-                LinearGradient(
-                    colors: [
-                        Color(red: 6.0/255.0, green: 18.0/255.0, blue: 24.0/255.0).opacity(0.58),
-                        Color.black.opacity(0.72),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-            .clipped()
+            LinearGradient(
+                colors: [
+                    Color(red: 6.0/255.0, green: 18.0/255.0, blue: 24.0/255.0).opacity(0.62),
+                    Color.black.opacity(0.76),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
+        .clipped()
     }
 }
 
@@ -140,7 +120,7 @@ private struct PrayerWidgetView: View {
     private let lightGold = Color(red: 226.0/255.0, green: 198.0/255.0, blue: 106.0/255.0)
 
     private var isArabic: Bool {
-        entry.appLanguage.map { $0 == "ar" } ?? (locale.language.languageCode?.identifier == "ar")
+        entry.appLanguage.map { $0 == "ar" } ?? locale.identifier.hasPrefix("ar")
     }
 
     private var locationName: String {
