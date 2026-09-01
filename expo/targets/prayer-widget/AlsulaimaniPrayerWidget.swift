@@ -38,7 +38,7 @@ private struct PrayerProvider: TimelineProvider {
         let entry = loadEntry()
         let nextRefresh = entry.prayer.map {
             min(Date(timeIntervalSince1970: $0.time).addingTimeInterval(30), Date().addingTimeInterval(15 * 60))
-        } ?? Date().addingTimeInterval(15 * 60)
+        } ?? Date().addingTimeInterval(30)
         completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
     }
 
