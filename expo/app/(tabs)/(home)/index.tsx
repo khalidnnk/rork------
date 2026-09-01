@@ -644,6 +644,7 @@ const styles = StyleSheet.create({
   },
   countdownTimerRow: {
     flexDirection: 'row',
+    direction: 'ltr',
     alignItems: 'center',
     marginBottom: 14,
   },
