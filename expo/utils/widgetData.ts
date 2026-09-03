@@ -33,7 +33,7 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
         date,
         settings.latitude,
         settings.longitude,
-        getTimezoneOffset(),
+        getTimezoneOffset(date, settings.timezoneId, settings.timezone),
         settings.offsets
       );
 

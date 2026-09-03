@@ -241,8 +241,44 @@ export function getDateKey(date?: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-export function getTimezoneOffset(): number {
-  return -(new Date().getTimezoneOffset() / 60);
+export function getDeviceTimezoneId(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+}
+
+export function getTimezoneOffset(date: Date = new Date(), timeZone?: string, fallbackOffset?: number): number {
+  if (!timeZone) {
+    return fallbackOffset ?? -(date.getTimezoneOffset() / 60);
+  }
+
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const representedAsUtc = Date.UTC(
+      Number(values.year),
+      Number(values.month) - 1,
+      Number(values.day),
+      Number(values.hour),
+      Number(values.minute),
+      Number(values.second)
+    );
+    return Math.round((representedAsUtc - date.getTime()) / 60_000) / 60;
+  } catch (error) {
+    console.warn('[PrayerTimes] Failed to resolve timezone offset:', timeZone, error);
+    return fallbackOffset ?? -(date.getTimezoneOffset() / 60);
+  }
 }
 
 export function getTimeUntil(target: Date): { hours: number; minutes: number; seconds: number; totalSeconds: number } {

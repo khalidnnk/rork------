@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 import type { AthanSettings } from '@/contexts/AthanContext';
-import { calculatePrayerTimes, getTimezoneOffset } from '@/utils/prayerTimes';
+import { calculatePrayerTimes, getDeviceTimezoneId, getTimezoneOffset } from '@/utils/prayerTimes';
 import { scheduleAllNotifications, showLocationUpdatedNotification } from '@/utils/notifications';
 import { publishWidgetData } from '@/utils/widgetData';
 import { ALL_CITIES } from '@/constants/cities';
@@ -86,12 +86,23 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
 
     const language = await getStoredLanguage();
     const locationName = await resolveLocationName(latitude, longitude, language);
-    const timezone = getTimezoneOffset();
+    const timezoneId = getDeviceTimezoneId();
+    const timezone = getTimezoneOffset(new Date(), timezoneId);
+
+    // Resolving a place name can take long enough for the user to disable
+    // travel updates or select a manual city. Re-read the settings so this
+    // background task never restores tracking with a stale snapshot.
+    const latestStored = await AsyncStorage.getItem(ATHAN_SETTINGS_STORAGE_KEY);
+    if (!latestStored) return;
+    const latestSettings = JSON.parse(latestStored) as AthanSettings;
+    if (!latestSettings.backgroundLocationEnabled || latestSettings.locationMode !== 'auto') return;
+
     const updatedSettings: AthanSettings = {
-      ...settings,
+      ...latestSettings,
       latitude,
       longitude,
       timezone,
+      timezoneId,
       locationName,
       locationMode: 'auto',
     };
@@ -114,7 +125,9 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
         latitude,
         longitude,
         updatedSettings.offsets,
-        language
+        language,
+        timezone,
+        timezoneId
       );
       await showLocationUpdatedNotification(locationName, language);
     }

@@ -13,6 +13,7 @@ import {
   DailyPrayers,
   calculatePrayerTimes,
   getNextPrayerWithTomorrow,
+  getDeviceTimezoneId,
   getTimezoneOffset,
   getDateKey,
 } from '@/utils/prayerTimes';
@@ -49,6 +50,7 @@ export interface AthanSettings {
   latitude: number;
   longitude: number;
   timezone: number;
+  timezoneId?: string;
   locationMode: 'auto' | 'manual';
   backgroundLocationEnabled: boolean;
   hasSeenWelcome: boolean;
@@ -75,6 +77,7 @@ const DEFAULT_SETTINGS: AthanSettings = {
   latitude: 24.7136,
   longitude: 46.6753,
   timezone: 3,
+  timezoneId: 'Asia/Riyadh',
   locationMode: 'auto' as const,
   backgroundLocationEnabled: false,
   hasSeenWelcome: false,
@@ -551,11 +554,13 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
               const lat = position.coords.latitude;
               const lng = position.coords.longitude;
               const tz = getTimezoneOffset();
+              const timezoneId = getDeviceTimezoneId();
               let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
               updateSettings({
                 latitude: lat,
                 longitude: lng,
                 timezone: tz,
+                timezoneId,
                 locationName,
                 locationMode: 'auto',
               });
@@ -583,6 +588,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       const lat = loc.coords.latitude;
       const lng = loc.coords.longitude;
       const tz = getTimezoneOffset();
+      const timezoneId = getDeviceTimezoneId();
 
       const locationName = await resolveLocationName(lat, lng, language);
 
@@ -590,6 +596,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         latitude: lat,
         longitude: lng,
         timezone: tz,
+        timezoneId,
         locationName,
         locationMode: 'auto',
       });
@@ -620,10 +627,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
               const lat = position.coords.latitude;
               const lng = position.coords.longitude;
               const tz = getTimezoneOffset();
+              const timezoneId = getDeviceTimezoneId();
               updateSettings({
                 latitude: lat,
                 longitude: lng,
                 timezone: tz,
+                timezoneId,
                 locationName: `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`,
                 locationMode: 'auto',
               });
@@ -654,6 +663,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       const lat = loc.coords.latitude;
       const lng = loc.coords.longitude;
       const tz = getTimezoneOffset();
+      const timezoneId = getDeviceTimezoneId();
 
       const locationName = await resolveLocationName(lat, lng, language);
 
@@ -661,6 +671,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         latitude: lat,
         longitude: lng,
         timezone: tz,
+        timezoneId,
         locationName,
         locationMode: 'auto',
       });
@@ -714,31 +725,31 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const [dateKey, setDateKey] = useState<string>(getDateKey());
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayers>(() => {
     console.log('[AthanContext] Initial prayer times calculation');
-    const systemTz = getTimezoneOffset();
+    const timezone = getTimezoneOffset(new Date(), DEFAULT_SETTINGS.timezoneId, DEFAULT_SETTINGS.timezone);
     return calculatePrayerTimes(
       new Date(),
       DEFAULT_SETTINGS.latitude,
       DEFAULT_SETTINGS.longitude,
-      systemTz,
+      timezone,
       DEFAULT_SETTINGS.offsets
     );
   });
   const [nextPrayer, setNextPrayer] = useState<PrayerTime | null>(null);
 
   const recalculatePrayers = useCallback(() => {
-    const systemTz = getTimezoneOffset();
     const now = new Date();
+    const timezone = getTimezoneOffset(now, settings.timezoneId, settings.timezone);
     const prayers = calculatePrayerTimes(
       now,
       settings.latitude,
       settings.longitude,
-      systemTz,
+      timezone,
       settings.offsets
     );
     console.log('[AthanContext] Prayer times:', prayers.prayers.map(p => `${p.name}: ${p.timeStr}`).join(', '));
     setDailyPrayers(prayers);
     return prayers;
-  }, [settings.latitude, settings.longitude, settings.offsets]);
+  }, [settings.latitude, settings.longitude, settings.timezone, settings.timezoneId, settings.offsets]);
 
   useEffect(() => {
     recalculatePrayers();
@@ -752,12 +763,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   useEffect(() => {
     const updateNextPrayer = () => {
       const now = new Date();
-      const systemTz = getTimezoneOffset();
+      const timezone = getTimezoneOffset(now, settings.timezoneId, settings.timezone);
       const result = getNextPrayerWithTomorrow(
         dailyPrayers.prayers,
         settings.latitude,
         settings.longitude,
-        systemTz,
+        timezone,
         settings.offsets
       );
       if (result) {
@@ -795,7 +806,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
             new Date(),
             storedSettings.latitude,
             storedSettings.longitude,
-            getTimezoneOffset(),
+            getTimezoneOffset(new Date(), storedSettings.timezoneId, storedSettings.timezone),
             storedSettings.offsets
           ));
           if (storedSettings.locationMode === 'auto') {
@@ -818,12 +829,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     async function scheduleNotifs() {
       const granted = await requestNotificationPermissions(language);
       if (granted) {
-        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, language);
+        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, language, settings.timezone, settings.timezoneId);
       }
     }
 
     void scheduleNotifs();
-  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, language]);
+  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, settings.timezone, settings.timezoneId, language]);
 
   return useMemo(() => ({
     settings,

@@ -229,7 +229,9 @@ export async function scheduleAllNotifications(
   latitude: number = 24.7136,
   longitude: number = 46.6753,
   offsets: Record<PrayerName, number> = { fajr: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 },
-  language?: AppLanguage
+  language?: AppLanguage,
+  timezone: number = getTimezoneOffset(),
+  timezoneId?: string
 ): Promise<void> {
   if (Platform.OS === 'web') return;
   language ??= await getStoredLanguage();
@@ -251,7 +253,13 @@ export async function scheduleAllNotifications(
       date.setDate(today.getDate() + dayOffset);
       const dayPrayers = dayOffset === 0
         ? prayers
-        : calculatePrayerTimes(date, latitude, longitude, getTimezoneOffset(), offsets).prayers;
+        : calculatePrayerTimes(
+          date,
+          latitude,
+          longitude,
+          getTimezoneOffset(date, timezoneId, timezone),
+          offsets
+        ).prayers;
 
       for (const prayer of dayPrayers) {
         if (requestId !== latestSchedulingRequest) {
@@ -278,15 +286,15 @@ export async function scheduleAllNotifications(
   await schedulingTask;
 }
 
-export async function showLocationUpdatedNotification(locationName: string, language?: AppLanguage): Promise<void> {
+export async function showLocationUpdatedNotification(_locationName: string, language?: AppLanguage): Promise<void> {
   if (Platform.OS === 'web') return;
   language ??= await getStoredLanguage();
   await Notifications.scheduleNotificationAsync({
     content: {
       title: translate(language, 'appName'),
-      body: translate(language, 'locationUpdated', { location: locationName }),
+      body: translate(language, 'locationUpdatedPrivate'),
       sound: true,
-      data: { type: 'location-updated', locationName },
+      data: { type: 'location-updated' },
     },
     trigger: null,
   });

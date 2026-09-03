@@ -343,6 +343,7 @@ export default function SettingsScreen() {
       latitude: city.latitude,
       longitude: city.longitude,
       timezone: city.timezone,
+      timezoneId: city.timezoneId,
       locationName: city.name,
       locationMode: 'manual',
     });

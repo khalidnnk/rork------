@@ -273,13 +273,6 @@ export default function HomeScreen() {
   const countdownScale = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
-    if (reduceMotion) {
-      fadeAnim.setValue(1);
-      countdownScale.setValue(1);
-      slideAnims.forEach((anim) => anim.setValue(0));
-      opacityAnims.forEach((anim) => anim.setValue(1));
-      return;
-    }
     if (!settings.hasSeenWelcome) {
       const timer = setTimeout(() => setShowWelcome(true), 600);
       return () => clearTimeout(timer);
@@ -287,6 +280,14 @@ export default function HomeScreen() {
   }, [settings.hasSeenWelcome]);
 
   useEffect(() => {
+    if (reduceMotion) {
+      fadeAnim.setValue(1);
+      countdownScale.setValue(1);
+      slideAnims.forEach((anim) => anim.setValue(0));
+      opacityAnims.forEach((anim) => anim.setValue(1));
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
