@@ -1,0 +1,13 @@
+name: Upload iOS 1.0.0 (35) to App Store Connect
+
+on:
+  push:
+    branches: ['feature/v1.3.4-location-widget-ui']
+
+jobs:
+  submit_ios:
+    name: Upload iOS 1.0.0 (35) to App Store Connect
+    type: submit
+    params:
+      build_id: 43fe557f-6225-4151-8e9a-364ea9ab8aac
+      profile: production
