@@ -289,13 +289,13 @@ export async function scheduleAllNotifications(
   await schedulingTask;
 }
 
-export async function showLocationUpdatedNotification(_locationName: string, language?: AppLanguage): Promise<void> {
+export async function showLocationUpdatedNotification(locationName: string, language?: AppLanguage): Promise<void> {
   if (Platform.OS === 'web') return;
   language ??= await getStoredLanguage();
   await Notifications.scheduleNotificationAsync({
     content: {
       title: translate(language, 'appName'),
-      body: translate(language, 'locationUpdatedPrivate'),
+      body: translate(language, 'locationUpdated', { location: locationName }),
       sound: true,
       data: { type: 'location-updated' },
     },
