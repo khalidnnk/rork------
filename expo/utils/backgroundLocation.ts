@@ -17,6 +17,49 @@ type LocationTaskData = {
   locations?: Location.LocationObject[];
 };
 
+type ResolvedLocation = {
+  name: string;
+  countryCode?: string;
+};
+
+const COUNTRY_CODES: Record<string, string> = {
+  Algeria: 'DZ',
+  Bahrain: 'BH',
+  Comoros: 'KM',
+  Djibouti: 'DJ',
+  Egypt: 'EG',
+  Iraq: 'IQ',
+  Jordan: 'JO',
+  Kuwait: 'KW',
+  Lebanon: 'LB',
+  Libya: 'LY',
+  Mauritania: 'MR',
+  Morocco: 'MA',
+  Oman: 'OM',
+  Palestine: 'PS',
+  Qatar: 'QA',
+  'Saudi Arabia': 'SA',
+  Somalia: 'SO',
+  Sudan: 'SD',
+  Syria: 'SY',
+  Tunisia: 'TN',
+  UAE: 'AE',
+  Yemen: 'YE',
+};
+
+function countryCodeToFlag(countryCode?: string | null): string {
+  const normalized = countryCode?.trim().toUpperCase();
+  if (!normalized || !/^[A-Z]{2}$/.test(normalized)) return '';
+  return String.fromCodePoint(
+    ...Array.from(normalized).map((character) => 0x1F1E6 + character.charCodeAt(0) - 65)
+  );
+}
+
+function formatLocationWithFlag(location: ResolvedLocation): string {
+  const flag = countryCodeToFlag(location.countryCode);
+  return flag ? `${location.name} ${flag}` : location.name;
+}
+
 function distanceInMeters(
   latitudeA: number,
   longitudeA: number,
@@ -33,17 +76,20 @@ function distanceInMeters(
   return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export async function resolveLocationName(latitude: number, longitude: number, language: AppLanguage = 'ar'): Promise<string> {
+async function resolveLocation(latitude: number, longitude: number, language: AppLanguage = 'ar'): Promise<ResolvedLocation> {
   try {
     const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
     const address = addresses[0];
     if (address) {
-      return address.city
+      return {
+        name: address.city
         || address.district
         || address.subregion
         || address.region
         || address.country
-        || translate(language, 'newArea');
+        || translate(language, 'newArea'),
+        countryCode: address.isoCountryCode || undefined,
+      };
     }
   } catch (error) {
     console.log('[BackgroundLocation] Reverse geocode failed:', error);
@@ -52,18 +98,26 @@ export async function resolveLocationName(latitude: number, longitude: number, l
   // Reverse geocoding can require a network connection. Fall back to the
   // bundled city list so travel updates still have a useful Arabic name when
   // the device is offline.
-  const nearestCity = ALL_CITIES.reduce<{ name: string; distance: number } | null>((nearest, city) => {
+  const nearestCity = ALL_CITIES.reduce<ResolvedLocation & { distance: number } | null>((nearest, city) => {
     const distance = distanceInMeters(latitude, longitude, city.latitude, city.longitude);
     if (!nearest || distance < nearest.distance) {
-      return { name: language === 'ar' ? city.nameAr : city.name, distance };
+      return {
+        name: language === 'ar' ? city.nameAr : city.name,
+        countryCode: COUNTRY_CODES[city.country],
+        distance,
+      };
     }
     return nearest;
   }, null);
 
   // Avoid naming a distant city when the user is outside the bundled coverage.
   return nearestCity && nearestCity.distance <= 150_000
-    ? nearestCity.name
-    : translate(language, 'yourCurrentLocation');
+    ? nearestCity
+    : { name: translate(language, 'yourCurrentLocation') };
+}
+
+export async function resolveLocationName(latitude: number, longitude: number, language: AppLanguage = 'ar'): Promise<string> {
+  return (await resolveLocation(latitude, longitude, language)).name;
 }
 
 TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
@@ -85,7 +139,8 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
     if (travelled < MINIMUM_TRAVEL_DISTANCE_METERS) return;
 
     const language = await getStoredLanguage();
-    const locationName = await resolveLocationName(latitude, longitude, language);
+    const resolvedLocation = await resolveLocation(latitude, longitude, language);
+    const locationName = resolvedLocation.name;
     const timezoneId = getDeviceTimezoneId();
     const timezone = getTimezoneOffset(new Date(), timezoneId);
 
@@ -129,7 +184,7 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
         timezone,
         timezoneId
       );
-      await showLocationUpdatedNotification(locationName, language);
+      await showLocationUpdatedNotification(formatLocationWithFlag(resolvedLocation), language);
     }
   } catch (taskError) {
     console.error('[BackgroundLocation] Failed to update location:', taskError);
