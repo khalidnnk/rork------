@@ -7,6 +7,7 @@ private let widgetKind = "AlsulaimaniPrayerWidget"
 
 private struct SharedPrayer: Codable {
     let name: String
+    let label: String?
     let labelAr: String
     let time: Double
     let timeText: String
@@ -40,6 +41,7 @@ private struct PrayerProvider: TimelineProvider {
             alwaysLocationEnabled: false,
             prayer: SharedPrayer(
                 name: "asr",
+                label: "Asr",
                 labelAr: "العصر",
                 time: Date().addingTimeInterval(3600).timeIntervalSince1970,
                 timeText: "3:41 PM"
@@ -136,6 +138,7 @@ private struct PrayerProvider: TimelineProvider {
            storedTime.doubleValue > now {
             prayers = [SharedPrayer(
                 name: name,
+                label: nil,
                 labelAr: labelAr,
                 time: storedTime.doubleValue,
                 timeText: timeText
@@ -236,7 +239,17 @@ private struct PrayerWidgetView: View {
     }
 
     private func prayerLabel(_ prayer: SharedPrayer) -> String {
+        if prayer.name == "dhuhr" {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .autoupdatingCurrent
+            let prayerDate = Date(timeIntervalSince1970: prayer.time)
+            if calendar.component(.weekday, from: prayerDate) == 6 {
+                return isArabic ? "صلاة الجمعة" : "Jumu'ah Prayer"
+            }
+        }
+
         guard !isArabic else { return prayer.labelAr }
+        if let label = prayer.label, !label.isEmpty { return label }
         switch prayer.name {
         case "fajr": return "Fajr"
         case "dhuhr": return "Dhuhr"

@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { PrayerTime, PrayerName, calculatePrayerTimes, getTimezoneOffset } from './prayerTimes';
+import { PrayerTime, PrayerName, calculatePrayerTimes, getTimezoneOffset, isJumuahPrayer } from './prayerTimes';
 import type { NotificationSoundType } from '@/contexts/AthanContext';
 import { AppLanguage, getStoredLanguage, translate } from '@/utils/i18n';
 
@@ -156,9 +156,12 @@ export async function scheduleAthanNotification(
     ].join('');
     const identifier = `athan-${prayer.name}-${dateKey}`;
 
+    const localizedPrayerLabel = language === 'ar' ? prayer.labelAr : prayer.label;
     const notificationContent: Notifications.NotificationContentInput = {
-      title: translate(language, 'prayerTimeTitle', { prayer: language === 'ar' ? prayer.labelAr : prayer.label }),
-      body: translate(language, 'prayerBody', { prayer: language === 'ar' ? prayer.labelAr : prayer.label, time: prayer.timeStr }),
+      title: isJumuahPrayer(prayer.name, prayer.time)
+        ? translate(language, 'jumuahPrayerTimeTitle')
+        : translate(language, 'prayerTimeTitle', { prayer: localizedPrayerLabel }),
+      body: translate(language, 'prayerBody', { prayer: localizedPrayerLabel, time: prayer.timeStr }),
       sound: sound,
       data: { prayerName: prayer.name, time: prayer.timeStr, soundType },
     };

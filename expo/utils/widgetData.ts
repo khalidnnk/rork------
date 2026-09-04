@@ -12,6 +12,7 @@ let publishGeneration = 0;
 
 type WidgetPrayer = {
   name: string;
+  label: string;
   labelAr: string;
   time: number;
   timeText: string;
@@ -40,6 +41,7 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
       daily.prayers.forEach((prayer) => {
         prayers.push({
           name: prayer.name,
+          label: prayer.label,
           labelAr: prayer.labelAr,
           time: Math.floor(prayer.time.getTime() / 1000),
           timeText: prayer.timeStr,

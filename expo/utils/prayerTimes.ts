@@ -156,6 +156,12 @@ const PRAYER_LABELS: Record<PrayerName, { label: string; labelAr: string }> = {
   isha: { label: 'Isha', labelAr: 'العشاء' },
 };
 
+const JUMUAH_LABELS = { label: "Jumu'ah Prayer", labelAr: 'صلاة الجمعة' } as const;
+
+export function isJumuahPrayer(name: PrayerName, date: Date): boolean {
+  return name === 'dhuhr' && date.getDay() === 5;
+}
+
 export function calculatePrayerTimes(
   date: Date,
   latitude: number,
@@ -190,10 +196,11 @@ export function calculatePrayerTimes(
   const prayers: PrayerTime[] = prayerNames.map((name, i) => {
     const adjustedHours = hours[i] + (offsets[name] || 0) / 60;
     const time = hoursToDate(adjustedHours, baseDate);
+    const labels = isJumuahPrayer(name, time) ? JUMUAH_LABELS : PRAYER_LABELS[name];
     return {
       name,
-      label: PRAYER_LABELS[name].label,
-      labelAr: PRAYER_LABELS[name].labelAr,
+      label: labels.label,
+      labelAr: labels.labelAr,
       time,
       timeStr: formatTime(time),
     };
