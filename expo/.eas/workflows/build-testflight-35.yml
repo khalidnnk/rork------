@@ -1,0 +1,23 @@
+name: Build and upload iOS 1.0.0 (35)
+
+on:
+  push:
+    branches: ['feature/v1.3.4-location-widget-ui']
+
+jobs:
+  build_ios:
+    name: Build iOS 1.0.0 (35)
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  testflight_distribution:
+    name: Upload build 35 to TestFlight
+    needs: [build_ios]
+    type: testflight
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production
+      submit_beta_review: false
+      wait_processing_timeout_seconds: 1800
