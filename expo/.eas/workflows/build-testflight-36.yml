@@ -1,9 +1,6 @@
-name: Build and upload iOS 1.0.0 (36)
+name: Build and upload iOS 1.0.0 (36) (paused)
 
-on:
-  push:
-    branches: ['feature/v1.3.4-location-widget-ui']
-    paths: ['expo/.eas/workflows/build-testflight-36.yml']
+# Trigger disabled after the one-time build and TestFlight upload request.
 
 jobs:
   build_ios:
