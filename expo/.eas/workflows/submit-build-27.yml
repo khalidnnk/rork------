@@ -1,0 +1,11 @@
+name: Submit iOS build 27 (disabled)
+
+# Retained for build history only. No automatic trigger.
+
+jobs:
+  submit_ios:
+    name: Upload build 27 to App Store Connect
+    type: submit
+    params:
+      build_id: 5d79fd9b-4726-4662-9dc0-1b8511e8e461
+      profile: production

@@ -1,0 +1,11 @@
+name: Build iOS 1.0.0 (32) (paused)
+
+# Trigger disabled after Build 32 was requested to prevent duplicate builds.
+
+jobs:
+  build_ios:
+    name: Build iOS 1.0.0 (32)
+    type: build
+    params:
+      platform: ios
+      profile: production

@@ -11,6 +11,7 @@ const Colors = {
   text: '#ECF0F1',
   textSecondary: '#8BA4AD',
   textMuted: '#4A6670',
+  textMutedReadable: '#7F9AA4',
   success: '#2ECC71',
   successDim: 'rgba(46, 204, 113, 0.15)',
   danger: '#E74C3C',

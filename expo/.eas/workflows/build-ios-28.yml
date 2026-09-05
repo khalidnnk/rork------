@@ -1,0 +1,11 @@
+name: Build iOS 1.0.0 (28) (disabled)
+
+# Retained for build history only. No automatic trigger.
+
+jobs:
+  build_ios:
+    name: Build iOS 1.0.0 (28)
+    type: build
+    params:
+      platform: ios
+      profile: production

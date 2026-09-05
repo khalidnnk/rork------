@@ -1,0 +1,11 @@
+name: Upload iOS 1.0.0 (36) to App Store Connect (paused)
+
+# Trigger disabled after the one-time upload request.
+
+jobs:
+  submit_ios:
+    name: Upload iOS 1.0.0 (36) to App Store Connect
+    type: submit
+    params:
+      build_id: b465d247-317d-4606-86de-abade6e32471
+      profile: production

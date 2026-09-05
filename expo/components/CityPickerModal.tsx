@@ -14,6 +14,7 @@ import { X, Search, MapPin, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { City, COUNTRY_GROUPS } from '@/constants/cities';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface CityPickerModalProps {
   visible: boolean;
@@ -31,6 +32,7 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const [search, setSearch] = useState<string>('');
+  const { language, isRTL, t } = useLanguage();
 
   const sections = useMemo<SectionData[]>(() => {
     const query = search.trim().toLowerCase();
@@ -48,11 +50,11 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
         );
       }
       if (filtered.length > 0) {
-        result.push({ title: group.countryAr, data: filtered });
+        result.push({ title: language === 'ar' ? group.countryAr : group.country, data: filtered });
       }
     }
     return result;
-  }, [search]);
+  }, [search, language]);
 
   const handleSelect = useCallback((city: City) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -66,19 +68,24 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
   }, [onClose]);
 
   const renderItem = useCallback(({ item }: { item: City }) => {
-    const isSelected = currentCityName === item.nameAr;
+    const isSelected = currentCityName === item.nameAr || currentCityName === item.name;
+    const primaryName = language === 'ar' ? item.nameAr : item.name;
+    const secondaryName = language === 'ar' ? item.name : item.nameAr;
     return (
       <TouchableOpacity
         style={[modalStyles.cityRow, isSelected && modalStyles.cityRowSelected]}
         onPress={() => handleSelect(item)}
         activeOpacity={0.6}
         testID={`city-${item.name}`}
+        accessibilityRole="button"
+        accessibilityState={{ selected: isSelected }}
+        accessibilityLabel={t('chooseCityLabel', { city: primaryName })}
       >
         <View style={modalStyles.cityInfo}>
           <Text style={[modalStyles.cityName, isSelected && modalStyles.cityNameSelected]}>
-            {item.nameAr}
+            {primaryName}
           </Text>
-          <Text style={modalStyles.cityNameEn}>{item.name}</Text>
+          <Text style={modalStyles.cityNameEn}>{secondaryName}</Text>
         </View>
         {isSelected && (
           <View style={modalStyles.checkWrap}>
@@ -87,7 +94,7 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
         )}
       </TouchableOpacity>
     );
-  }, [currentCityName, handleSelect]);
+  }, [currentCityName, handleSelect, language, t]);
 
   const renderSectionHeader = useCallback(({ section }: { section: SectionData }) => (
     <View style={modalStyles.sectionHeader}>
@@ -99,19 +106,21 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
   const keyExtractor = useCallback((item: City, index: number) => `${item.country}-${item.name}-${index}`, []);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent accessibilityViewIsModal>
       <View style={[modalStyles.overlay, { paddingTop: insets.top }]}>
         <View style={[modalStyles.container, { maxHeight: height * 0.88, paddingBottom: insets.bottom + 12 }]}>
           <View style={modalStyles.header}>
             <View style={modalStyles.headerLeft}>
               <MapPin size={20} color={Colors.accent} />
-              <Text style={modalStyles.headerTitle}>اختيار المدينة</Text>
+              <Text style={modalStyles.headerTitle}>{t('chooseCity')}</Text>
             </View>
             <TouchableOpacity
               style={modalStyles.closeButton}
               onPress={handleClose}
               activeOpacity={0.7}
               testID="close-city-picker"
+              accessibilityRole="button"
+              accessibilityLabel={t('closeCityPicker')}
             >
               <X size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -120,16 +129,22 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
           <View style={modalStyles.searchWrap}>
             <Search size={16} color={Colors.textMuted} style={modalStyles.searchIcon} />
             <TextInput
-              style={modalStyles.searchInput}
-              placeholder="ابحث عن مدينة أو دولة..."
+              style={[modalStyles.searchInput, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+              placeholder={t('citySearch')}
               placeholderTextColor={Colors.textMuted}
               value={search}
               onChangeText={setSearch}
               autoCorrect={false}
               testID="city-search-input"
+              accessibilityLabel={t('citySearchLabel')}
             />
             {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')} style={modalStyles.clearButton}>
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                style={modalStyles.clearButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('clearSearch')}
+              >
                 <X size={14} color={Colors.textMuted} />
               </TouchableOpacity>
             )}
@@ -137,7 +152,7 @@ export default function CityPickerModal({ visible, onClose, onSelectCity, curren
 
           {sections.length === 0 ? (
             <View style={modalStyles.emptyWrap}>
-              <Text style={modalStyles.emptyText}>لا توجد نتائج</Text>
+              <Text style={modalStyles.emptyText}>{t('noResults')}</Text>
             </View>
           ) : (
             <SectionList
@@ -189,9 +204,9 @@ const modalStyles = StyleSheet.create({
     color: Colors.text,
   },
   closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -208,7 +223,7 @@ const modalStyles = StyleSheet.create({
     borderColor: Colors.cardBorder,
   },
   searchIcon: {
-    marginRight: 8,
+    marginHorizontal: 8,
   },
   searchInput: {
     flex: 1,
@@ -216,12 +231,13 @@ const modalStyles = StyleSheet.create({
     fontFamily: 'Dubai-Regular',
     color: Colors.text,
     paddingVertical: 12,
-    textAlign: 'right',
-    writingDirection: 'rtl',
   },
   clearButton: {
-    padding: 4,
-    marginLeft: 4,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 4,
   },
   listContent: {
     paddingHorizontal: 20,
@@ -272,8 +288,8 @@ const modalStyles = StyleSheet.create({
   },
   cityNameEn: {
     fontSize: 12,
-    fontFamily: 'Dubai-Regular',
-    color: Colors.textMuted,
+    fontFamily: 'Dubai-Medium',
+    color: Colors.textMutedReadable,
   },
   checkWrap: {
     width: 28,
@@ -292,6 +308,6 @@ const modalStyles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontFamily: 'Dubai-Medium',
-    color: Colors.textMuted,
+    color: Colors.textMutedReadable,
   },
 });

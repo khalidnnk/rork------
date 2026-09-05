@@ -4,11 +4,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { useFonts } from 'expo-font';
 import React, { useEffect, useState, useCallback } from 'react';
-import { Text, TextInput } from 'react-native';
+import { Linking, Text, TextInput, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AthanProvider, useAthan } from '@/contexts/AthanContext';
+import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import LocationOnboarding from '@/components/LocationOnboarding';
+import '@/utils/backgroundLocation';
 
 void SplashScreen.preventAutoHideAsync();
 SystemUI.setBackgroundColorAsync('#0B1A1F').catch(() => {});
@@ -40,6 +42,21 @@ const ONBOARDING_KEY = 'location_onboarding_seen';
 function AppContent() {
   const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
   const { detectAutoLocation } = useAthan();
+  const { isRTL, isReady, t } = useLanguage();
+
+  useEffect(() => {
+    const handleUrl = ({ url }: { url: string }) => {
+      if (url.startsWith('alsulaimani-athan://refresh-location')) {
+        void detectAutoLocation();
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleUrl);
+    void Linking.getInitialURL().then((url) => {
+      if (url) handleUrl({ url });
+    });
+    return () => subscription.remove();
+  }, [detectAutoLocation]);
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
@@ -57,24 +74,28 @@ function AppContent() {
     }
   }, [detectAutoLocation]);
 
-  if (onboardingSeen === null) return null;
+  if (onboardingSeen === null || !isReady) return null;
 
   if (!onboardingSeen) {
-    return <LocationOnboarding onComplete={handleOnboardingComplete} />;
+    return <View style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}><LocationOnboarding onComplete={handleOnboardingComplete} /></View>;
   }
 
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+    <View style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
+    <Stack screenOptions={{ headerBackTitle: t('back') }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     </Stack>
+    </View>
   );
 }
 
 function RootLayoutNav() {
   return (
-    <AthanProvider>
-      <AppContent />
-    </AthanProvider>
+    <LanguageProvider>
+      <AthanProvider>
+        <AppContent />
+      </AthanProvider>
+    </LanguageProvider>
   );
 }
 
@@ -98,7 +119,7 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <RootLayoutNav />
       </GestureHandlerRootView>
     </QueryClientProvider>

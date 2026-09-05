@@ -13,6 +13,7 @@ import {
   DailyPrayers,
   calculatePrayerTimes,
   getNextPrayerWithTomorrow,
+  getDeviceTimezoneId,
   getTimezoneOffset,
   getDateKey,
 } from '@/utils/prayerTimes';
@@ -21,17 +22,22 @@ import {
   requestNotificationPermissions,
   scheduleAllNotifications,
 } from '@/utils/notifications';
+import {
+  ATHAN_SETTINGS_STORAGE_KEY,
+  resolveLocationName,
+  startBackgroundLocationUpdates,
+  stopBackgroundLocationUpdates,
+} from '@/utils/backgroundLocation';
+import { publishWidgetData } from '@/utils/widgetData';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 
-const STORAGE_KEY = 'athan_settings_v3';
+const STORAGE_KEY = ATHAN_SETTINGS_STORAGE_KEY;
 const ATHAN_MAX_DURATION = 300;
 
 const fullAthanModule = require('@/assets/audio/athan.m4a');
 const hayaModule = require('@/assets/audio/haya_ala_salah.m4a');
 const allahuAkbarModule = require('@/assets/audio/allahu_akbar.m4a');
-const FULL_ATHAN_WEB_URL = 'https://r2-pub.rork.com/attachments/z0hdqpl2rrummm8nej54s';
-const HAYA_WEB_URL = 'https://r2-pub.rork.com/attachments/hlw21fvf05k0k9b6432nz';
-const ALLAHU_AKBAR_WEB_URL = 'https://r2-pub.rork.com/attachments/er1fm5r0twtn9sod0fbrh';
 const NOTIFICATION_ATHAN_RESUME_POSITION = 30;
 
 export type NotificationSoundType = 'athan' | 'full_athan' | 'allahu_akbar' | 'default' | 'silent';
@@ -44,7 +50,9 @@ export interface AthanSettings {
   latitude: number;
   longitude: number;
   timezone: number;
+  timezoneId?: string;
   locationMode: 'auto' | 'manual';
+  backgroundLocationEnabled: boolean;
   hasSeenWelcome: boolean;
   notificationSound: NotificationSoundType;
 }
@@ -69,7 +77,9 @@ const DEFAULT_SETTINGS: AthanSettings = {
   latitude: 24.7136,
   longitude: 46.6753,
   timezone: 3,
+  timezoneId: 'Asia/Riyadh',
   locationMode: 'auto' as const,
+  backgroundLocationEnabled: false,
   hasSeenWelcome: false,
   notificationSound: 'athan' as const,
 };
@@ -79,6 +89,11 @@ async function loadSettings(): Promise<AthanSettings> {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
+      // Full Athan remains available inside the app, but it is no longer an
+      // alert-sound option because iOS notification sounds must be short.
+      if (parsed.notificationSound === 'full_athan') {
+        parsed.notificationSound = 'athan';
+      }
       return { ...DEFAULT_SETTINGS, ...parsed };
     }
   } catch (e) {
@@ -99,6 +114,7 @@ async function saveSettings(settings: AthanSettings): Promise<AthanSettings> {
 
 export const [AthanProvider, useAthan] = createContextHook(() => {
   const queryClient = useQueryClient();
+  const { language, t } = useLanguage();
   const [settings, setSettings] = useState<AthanSettings>(DEFAULT_SETTINGS);
   const [locationLoading, setLocationLoading] = useState<boolean>(false);
   const [isAdhanPlaying, setIsAdhanPlaying] = useState<boolean>(false);
@@ -106,7 +122,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   const [previewingSoundType, setPreviewingSoundType] = useState<NotificationSoundType | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [resolvedFullAthan, setResolvedFullAthan] = useState<{ uri: string } | null>(null);
   const [resolvedHaya, setResolvedHaya] = useState<{ uri: string } | null>(null);
@@ -121,24 +136,19 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     return null;
   }, [resolvedFullAthan, resolvedHaya, resolvedAllahuAkbar]);
 
-  const getWebUrlForType = useCallback((type: NotificationSoundType): string => {
-    if (type === 'full_athan') return FULL_ATHAN_WEB_URL;
-    if (type === 'allahu_akbar') return ALLAHU_AKBAR_WEB_URL;
-    return HAYA_WEB_URL;
+  const getBundledSourceForType = useCallback((type: NotificationSoundType): { uri: string } => {
+    const module = type === 'full_athan'
+      ? fullAthanModule
+      : type === 'allahu_akbar'
+        ? allahuAkbarModule
+        : hayaModule;
+    return { uri: Asset.fromModule(module).uri };
   }, []);
 
   useEffect(() => {
     async function resolveAudioSources() {
       if (sourceResolved.current) return;
       sourceResolved.current = true;
-
-      if (Platform.OS === 'web') {
-        console.log('[AthanContext] Web platform - using remote URLs');
-        setResolvedFullAthan({ uri: FULL_ATHAN_WEB_URL });
-        setResolvedHaya({ uri: HAYA_WEB_URL });
-        setResolvedAllahuAkbar({ uri: ALLAHU_AKBAR_WEB_URL });
-        return;
-      }
 
       try {
         console.log('[AthanContext] Resolving local audio assets...');
@@ -155,32 +165,32 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
           setResolvedFullAthan({ uri: fullUri });
           console.log('[AthanContext] Full athan source set to:', fullUri);
         } else {
-          setResolvedFullAthan({ uri: FULL_ATHAN_WEB_URL });
+          setResolvedFullAthan(getBundledSourceForType('full_athan'));
         }
 
         if (hayaUri) {
           setResolvedHaya({ uri: hayaUri });
           console.log('[AthanContext] Haya source set to:', hayaUri);
         } else {
-          setResolvedHaya({ uri: HAYA_WEB_URL });
+          setResolvedHaya(getBundledSourceForType('athan'));
         }
 
         if (akbarUri) {
           setResolvedAllahuAkbar({ uri: akbarUri });
           console.log('[AthanContext] Allahu Akbar source set to:', akbarUri);
         } else {
-          setResolvedAllahuAkbar({ uri: ALLAHU_AKBAR_WEB_URL });
+          setResolvedAllahuAkbar(getBundledSourceForType('allahu_akbar'));
         }
       } catch (e) {
         console.error('[AthanContext] Error resolving audio assets:', e);
-        setResolvedFullAthan({ uri: FULL_ATHAN_WEB_URL });
-        setResolvedHaya({ uri: HAYA_WEB_URL });
-        setResolvedAllahuAkbar({ uri: ALLAHU_AKBAR_WEB_URL });
+        setResolvedFullAthan(getBundledSourceForType('full_athan'));
+        setResolvedHaya(getBundledSourceForType('athan'));
+        setResolvedAllahuAkbar(getBundledSourceForType('allahu_akbar'));
       }
     }
 
     void resolveAudioSources();
-  }, []);
+  }, [getBundledSourceForType]);
 
   const currentSource = settings.notificationSound === 'full_athan'
     ? resolvedFullAthan
@@ -248,7 +258,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       player.muted = false;
 
       const actualType = (resumeFromNotification && soundType === 'full_athan') ? 'full_athan' : soundType;
-      const source = getSourceForType(actualType) || { uri: getWebUrlForType(actualType) };
+      const source = getSourceForType(actualType) || getBundledSourceForType(actualType);
 
       player.replace(source);
       const loaded = await waitForLoaded(5000);
@@ -267,7 +277,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         console.log('[AthanContext] Player loaded and playing type:', soundType);
       } else {
         console.log('[AthanContext] Trying fallback URL for type:', soundType);
-        player.replace({ uri: getWebUrlForType(actualType) });
+        player.replace(getBundledSourceForType(actualType));
         const fallbackLoaded = await waitForLoaded(5000);
         if (fallbackLoaded) {
           if (resumeFromNotification && soundType === 'full_athan') {
@@ -296,7 +306,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.error('[AthanContext] Error playing athan:', e);
       setIsAdhanPlaying(false);
     }
-  }, [player, waitForLoaded, getSourceForType, getWebUrlForType]);
+  }, [player, waitForLoaded, getSourceForType, getBundledSourceForType]);
 
   const playAthan = useCallback(async () => {
     await playAthanWithType('full_athan');
@@ -348,13 +358,13 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       player.muted = false;
 
       if (soundType === 'athan' || soundType === 'full_athan' || soundType === 'allahu_akbar') {
-        const source = getSourceForType(soundType) || { uri: getWebUrlForType(soundType) };
+        const source = getSourceForType(soundType) || getBundledSourceForType(soundType);
         console.log('[AthanContext] Preview: replacing with source for type:', soundType);
         player.replace(source);
         let loaded = await waitForLoaded(5000);
         if (!loaded) {
           console.log('[AthanContext] Preview: trying fallback URL...');
-          player.replace({ uri: getWebUrlForType(soundType) });
+          player.replace(getBundledSourceForType(soundType));
           loaded = await waitForLoaded(5000);
         }
         if (loaded) {
@@ -380,8 +390,8 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         if (Platform.OS !== 'web') {
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: 'معاينة صوت التنبيه',
-              body: 'هذا هو صوت التنبيه الافتراضي',
+              title: t('previewTitle'),
+              body: t('previewBody'),
               sound: 'default',
             },
             trigger: null,
@@ -397,7 +407,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       setIsPreviewPlaying(false);
       setPreviewingSoundType(null);
     }
-  }, [player, isPreviewPlaying, isAdhanPlaying, getSourceForType, getWebUrlForType, waitForLoaded]);
+  }, [player, isPreviewPlaying, isAdhanPlaying, getSourceForType, getBundledSourceForType, waitForLoaded, t]);
 
   const stopPreview = useCallback(() => {
     console.log('[AthanContext] Stopping preview');
@@ -469,10 +479,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   useEffect(() => {
     if (settingsQuery.data) {
       setSettings(settingsQuery.data);
-      if (!hasAutoDetected.current) {
-        hasAutoDetected.current = true;
-        console.log('[AthanContext] Settings loaded, skipping auto-detect (handled by onboarding)');
-      }
     }
   }, [settingsQuery.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -527,7 +533,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
 
   const setLocation = useCallback(
     (latitude: number, longitude: number, locationName: string, timezone: number) => {
-      console.log('[AthanContext] Setting location:', locationName, latitude, longitude);
       updateSettings({
         latitude,
         longitude,
@@ -540,7 +545,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     [updateSettings]
   );
 
-  const _detectAutoLocationSilent = useCallback(async () => {
+  const detectAutoLocationSilent = useCallback(async () => {
     try {
       if (Platform.OS === 'web') {
         if ('geolocation' in navigator) {
@@ -549,11 +554,13 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
               const lat = position.coords.latitude;
               const lng = position.coords.longitude;
               const tz = getTimezoneOffset();
+              const timezoneId = getDeviceTimezoneId();
               let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
               updateSettings({
                 latitude: lat,
                 longitude: lng,
                 timezone: tz,
+                timezoneId,
                 locationName,
                 locationMode: 'auto',
               });
@@ -566,7 +573,9 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         return;
       }
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // Never show a permission prompt silently. Onboarding/settings own the
+      // prompt; automatic refresh only uses a permission already granted.
+      const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') {
         console.log('[AthanContext] Location permission denied on startup');
         return;
@@ -579,29 +588,34 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       const lat = loc.coords.latitude;
       const lng = loc.coords.longitude;
       const tz = getTimezoneOffset();
+      const timezoneId = getDeviceTimezoneId();
 
-      let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
-      try {
-        const addresses = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-        if (addresses.length > 0) {
-          const addr = addresses[0];
-          locationName = [addr.city, addr.country].filter(Boolean).join(', ');
-        }
-      } catch (e) {
-        console.log('[AthanContext] Reverse geocode failed:', e);
-      }
+      const locationName = await resolveLocationName(lat, lng, language);
 
       updateSettings({
         latitude: lat,
         longitude: lng,
         timezone: tz,
+        timezoneId,
         locationName,
         locationMode: 'auto',
       });
     } catch (e) {
       console.error('[AthanContext] Silent location error:', e);
     }
-  }, [updateSettings]);
+  }, [updateSettings, language]);
+
+  // Automatic is the default mode. It remains active across launches until
+  // the user explicitly chooses a city, which switches locationMode to manual.
+  useEffect(() => {
+    const loadedSettings = settingsQuery.data;
+    if (!loadedSettings || hasAutoDetected.current) return;
+
+    hasAutoDetected.current = true;
+    if (loadedSettings.locationMode === 'auto') {
+      void detectAutoLocationSilent();
+    }
+  }, [detectAutoLocationSilent, settingsQuery.data]);
 
   const detectAutoLocation = useCallback(async () => {
     setLocationLoading(true);
@@ -613,10 +627,12 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
               const lat = position.coords.latitude;
               const lng = position.coords.longitude;
               const tz = getTimezoneOffset();
+              const timezoneId = getDeviceTimezoneId();
               updateSettings({
                 latitude: lat,
                 longitude: lng,
                 timezone: tz,
+                timezoneId,
                 locationName: `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`,
                 locationMode: 'auto',
               });
@@ -647,22 +663,15 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       const lat = loc.coords.latitude;
       const lng = loc.coords.longitude;
       const tz = getTimezoneOffset();
+      const timezoneId = getDeviceTimezoneId();
 
-      let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
-      try {
-        const addresses = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-        if (addresses.length > 0) {
-          const addr = addresses[0];
-          locationName = [addr.city, addr.country].filter(Boolean).join(', ');
-        }
-      } catch (e) {
-        console.log('[AthanContext] Reverse geocode failed:', e);
-      }
+      const locationName = await resolveLocationName(lat, lng, language);
 
       updateSettings({
         latitude: lat,
         longitude: lng,
         timezone: tz,
+        timezoneId,
         locationName,
         locationMode: 'auto',
       });
@@ -671,51 +680,95 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       console.error('[AthanContext] Location error:', e);
       setLocationLoading(false);
     }
+  }, [updateSettings, language]);
+
+  const setBackgroundLocationEnabled = useCallback(async (enabled: boolean): Promise<boolean> => {
+    if (Platform.OS === 'web') return false;
+
+    if (!enabled) {
+      await stopBackgroundLocationUpdates();
+      updateSettings({ backgroundLocationEnabled: false });
+      return true;
+    }
+
+    const foreground = await Location.requestForegroundPermissionsAsync();
+    if (foreground.status !== 'granted') {
+      updateSettings({ backgroundLocationEnabled: false });
+      return false;
+    }
+
+    const background = await Location.requestBackgroundPermissionsAsync();
+    if (background.status !== 'granted') {
+      updateSettings({ backgroundLocationEnabled: false });
+      return false;
+    }
+
+    await startBackgroundLocationUpdates();
+    updateSettings({ backgroundLocationEnabled: true, locationMode: 'auto' });
+    return true;
   }, [updateSettings]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || settingsQuery.isLoading) return;
+    if (!settings.backgroundLocationEnabled) return;
+
+    void Location.getBackgroundPermissionsAsync().then((permission) => {
+      if (permission.status === 'granted') {
+        return startBackgroundLocationUpdates();
+      }
+      updateSettings({ backgroundLocationEnabled: false });
+    }).catch((error) => {
+      console.error('[AthanContext] Background location restore failed:', error);
+    });
+  }, [settings.backgroundLocationEnabled, settingsQuery.isLoading, updateSettings]);
 
   const [dateKey, setDateKey] = useState<string>(getDateKey());
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayers>(() => {
     console.log('[AthanContext] Initial prayer times calculation');
-    const systemTz = getTimezoneOffset();
+    const timezone = getTimezoneOffset(new Date(), DEFAULT_SETTINGS.timezoneId, DEFAULT_SETTINGS.timezone);
     return calculatePrayerTimes(
       new Date(),
       DEFAULT_SETTINGS.latitude,
       DEFAULT_SETTINGS.longitude,
-      systemTz,
+      timezone,
       DEFAULT_SETTINGS.offsets
     );
   });
   const [nextPrayer, setNextPrayer] = useState<PrayerTime | null>(null);
 
   const recalculatePrayers = useCallback(() => {
-    const systemTz = getTimezoneOffset();
     const now = new Date();
-    console.log('[AthanContext] Recalculating prayer times | lat:', settings.latitude, 'lng:', settings.longitude, 'tz:', systemTz);
+    const timezone = getTimezoneOffset(now, settings.timezoneId, settings.timezone);
     const prayers = calculatePrayerTimes(
       now,
       settings.latitude,
       settings.longitude,
-      systemTz,
+      timezone,
       settings.offsets
     );
     console.log('[AthanContext] Prayer times:', prayers.prayers.map(p => `${p.name}: ${p.timeStr}`).join(', '));
     setDailyPrayers(prayers);
     return prayers;
-  }, [settings.latitude, settings.longitude, settings.offsets]);
+  }, [settings.latitude, settings.longitude, settings.timezone, settings.timezoneId, settings.offsets]);
 
   useEffect(() => {
     recalculatePrayers();
   }, [recalculatePrayers, dateKey]);
 
   useEffect(() => {
+    if (settingsQuery.isLoading) return;
+    publishWidgetData(settings, language);
+  }, [settings, language, settingsQuery.isLoading]);
+
+  useEffect(() => {
     const updateNextPrayer = () => {
       const now = new Date();
-      const systemTz = getTimezoneOffset();
+      const timezone = getTimezoneOffset(now, settings.timezoneId, settings.timezone);
       const result = getNextPrayerWithTomorrow(
         dailyPrayers.prayers,
         settings.latitude,
         settings.longitude,
-        systemTz,
+        timezone,
         settings.offsets
       );
       if (result) {
@@ -743,27 +796,27 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
   }, [dailyPrayers, settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
 
   useEffect(() => {
-    refreshTimerRef.current = setInterval(() => {
-      console.log('[AthanContext] Auto-refresh prayer times');
-      recalculatePrayers();
-    }, 60000);
-
-    return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
-    };
-  }, [recalculatePrayers]);
-
-  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         console.log('[AthanContext] App became active, refreshing prayer times');
-        recalculatePrayers();
+        void loadSettings().then((storedSettings) => {
+          setSettings(storedSettings);
+          publishWidgetData(storedSettings, language);
+          setDailyPrayers(calculatePrayerTimes(
+            new Date(),
+            storedSettings.latitude,
+            storedSettings.longitude,
+            getTimezoneOffset(new Date(), storedSettings.timezoneId, storedSettings.timezone),
+            storedSettings.offsets
+          ));
+          if (storedSettings.locationMode === 'auto') {
+            void detectAutoLocationSilent();
+          }
+        });
       }
     });
     return () => subscription.remove();
-  }, [recalculatePrayers]);
+  }, [detectAutoLocationSilent, language]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -774,14 +827,14 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
 
     async function scheduleNotifs() {
-      const granted = await requestNotificationPermissions();
+      const granted = await requestNotificationPermissions(language);
       if (granted) {
-        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets);
+        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, language, settings.timezone, settings.timezoneId);
       }
     }
 
     void scheduleNotifs();
-  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets]);
+  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, settings.timezone, settings.timezoneId, language]);
 
   return useMemo(() => ({
     settings,
@@ -792,6 +845,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     dismissWelcome,
     setLocation,
     detectAutoLocation,
+    setBackgroundLocationEnabled,
     dailyPrayers,
     nextPrayer,
     locationLoading,
@@ -816,6 +870,7 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     dismissWelcome,
     setLocation,
     detectAutoLocation,
+    setBackgroundLocationEnabled,
     dailyPrayers,
     nextPrayer,
     locationLoading,

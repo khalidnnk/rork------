@@ -1,0 +1,11 @@
+name: Upload iOS 1.0.0 (34) for testing (paused)
+
+# Trigger disabled after the one-time TestFlight upload request.
+
+jobs:
+  submit_ios:
+    name: Upload iOS 1.0.0 (34) to App Store Connect
+    type: submit
+    params:
+      build_id: 926522b6-5303-440d-9be1-70cea31bd1c6
+      profile: production

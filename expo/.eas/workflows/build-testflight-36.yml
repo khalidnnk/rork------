@@ -1,0 +1,21 @@
+name: Build and upload iOS 1.0.0 (36) (paused)
+
+# Trigger disabled after the one-time build and TestFlight upload request.
+
+jobs:
+  build_ios:
+    name: Build iOS 1.0.0 (36)
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  testflight_distribution:
+    name: Upload build 36 to TestFlight
+    needs: [build_ios]
+    type: testflight
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production
+      submit_beta_review: false
+      wait_processing_timeout_seconds: 1800

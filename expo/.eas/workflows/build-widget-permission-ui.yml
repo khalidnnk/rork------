@@ -1,0 +1,11 @@
+name: Build iOS widget permission UI (paused)
+
+# Trigger disabled after the one-time validation build.
+
+jobs:
+  build_ios:
+    name: Build iOS widget permission UI
+    type: build
+    params:
+      platform: ios
+      profile: production

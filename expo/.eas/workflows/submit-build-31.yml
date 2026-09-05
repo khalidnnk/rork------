@@ -1,0 +1,11 @@
+name: Submit iOS build 31 (disabled)
+
+# Retained for build history only. No automatic trigger.
+
+jobs:
+  submit_ios:
+    name: Upload build 31 to App Store Connect
+    type: submit
+    params:
+      build_id: 7b6913ff-eb19-4d25-abf5-11eeaf7d0de3
+      profile: production
