@@ -60,6 +60,10 @@ function formatLocationWithFlag(location: ResolvedLocation): string {
   return flag ? `${location.name} ${flag}` : location.name;
 }
 
+function normalizeLocationName(name: string): string {
+  return name.trim().toLocaleLowerCase();
+}
+
 function distanceInMeters(
   latitudeA: number,
   longitudeA: number,
@@ -152,6 +156,9 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
     const latestSettings = JSON.parse(latestStored) as AthanSettings;
     if (!latestSettings.backgroundLocationEnabled || latestSettings.locationMode !== 'auto') return;
 
+    const locationNameChanged = normalizeLocationName(latestSettings.locationName)
+      !== normalizeLocationName(locationName);
+
     const updatedSettings: AthanSettings = {
       ...latestSettings,
       latitude,
@@ -184,7 +191,9 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
         timezone,
         timezoneId
       );
-      await showLocationUpdatedNotification(formatLocationWithFlag(resolvedLocation), language);
+      if (locationNameChanged) {
+        await showLocationUpdatedNotification(formatLocationWithFlag(resolvedLocation), language);
+      }
     }
   } catch (taskError) {
     console.error('[BackgroundLocation] Failed to update location:', taskError);
