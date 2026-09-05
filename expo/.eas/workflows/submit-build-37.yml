@@ -1,11 +1,6 @@
-name: Upload iOS 1.0.0 (37) to App Store Connect
+name: Upload iOS 1.0.0 (37) to App Store Connect (paused)
 
-on:
-  push:
-    branches:
-      - feature/v1.3.4-location-widget-ui
-    paths:
-      - expo/.eas/workflows/submit-build-37.yml
+# Trigger disabled after the one-time upload request.
 
 jobs:
   submit_ios:
