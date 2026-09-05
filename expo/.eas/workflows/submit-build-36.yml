@@ -1,0 +1,14 @@
+name: Upload iOS 1.0.0 (36) to App Store Connect
+
+on:
+  push:
+    branches: ['feature/v1.3.4-location-widget-ui']
+    paths: ['expo/.eas/workflows/submit-build-36.yml']
+
+jobs:
+  submit_ios:
+    name: Upload iOS 1.0.0 (36) to App Store Connect
+    type: submit
+    params:
+      build_id: b465d247-317d-4606-86de-abade6e32471
+      profile: production
