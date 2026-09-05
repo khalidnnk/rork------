@@ -298,11 +298,20 @@ private struct PrayerWidgetView: View {
                 Spacer(minLength: 0)
 
                 if entry.alwaysLocationEnabled {
-                    Image(systemName: "location.fill")
+                    Text(locationName)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(gold)
-                        .frame(width: 30, height: 30)
-                        .accessibilityLabel(isArabic ? "الموقع يعمل دائمًا" : "Always-on location enabled")
+                        .foregroundStyle(.white.opacity(0.92))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.62)
+                        .allowsTightening(true)
+                        .truncationMode(.tail)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, minHeight: 30, alignment: .center)
+                        .accessibilityLabel(
+                            isArabic
+                                ? "موقع المواقيت: \(locationName)"
+                                : "Prayer location: \(locationName)"
+                        )
                 } else {
                     Link(destination: URL(string: "alsulaimani-athan://refresh-location")!) {
                         Image(systemName: "arrow.clockwise")
