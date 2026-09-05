@@ -1,0 +1,14 @@
+name: Build iOS 1.0.0 (37)
+
+on:
+  push:
+    branches: ['feature/v1.3.4-location-widget-ui']
+    paths: ['expo/.eas/workflows/build-ios-37.yml']
+
+jobs:
+  build_ios:
+    name: Build iOS 1.0.0 (37)
+    type: build
+    params:
+      platform: ios
+      profile: production
