@@ -1,0 +1,14 @@
+name: Build iOS Apple Review Cleanup
+
+on:
+  push:
+    branches: ['fix/apple-guideline-5-6-cleanup']
+    paths: ['expo/.eas/workflows/build-ios-38-apple-cleanup.yml']
+
+jobs:
+  build_ios:
+    name: Build iOS Apple Review Cleanup
+    type: build
+    params:
+      platform: ios
+      profile: production
