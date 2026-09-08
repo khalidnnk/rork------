@@ -5,7 +5,7 @@ on:
     branches: ['fix/apple-guideline-5-6-cleanup']
     paths: ['expo/.eas/workflows/submit-build-37.yml']
 
-# Retry upload for the already-successful cleaned iOS build.
+# Retry 2: upload the already-successful cleaned iOS Build 38.
 jobs:
   submit_ios:
     name: Upload Cleaned iOS Build to App Store Connect
