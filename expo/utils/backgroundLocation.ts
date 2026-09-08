@@ -8,6 +8,7 @@ import { scheduleAllNotifications, showLocationUpdatedNotification } from '@/uti
 import { publishWidgetData } from '@/utils/widgetData';
 import { ALL_CITIES } from '@/constants/cities';
 import { AppLanguage, getStoredLanguage, translate } from '@/utils/i18n';
+import { normalizeNotificationSound } from '@/utils/notificationTypes';
 
 export const BACKGROUND_LOCATION_TASK = 'athan-significant-location-change';
 export const ATHAN_SETTINGS_STORAGE_KEY = 'athan_settings_v3';
@@ -138,6 +139,7 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
     const stored = await AsyncStorage.getItem(ATHAN_SETTINGS_STORAGE_KEY);
     if (!stored) return;
     const settings = JSON.parse(stored) as AthanSettings;
+    settings.notificationSound = normalizeNotificationSound(settings.notificationSound);
     if (!settings.backgroundLocationEnabled || settings.locationMode !== 'auto') return;
 
     const latest = data.locations[data.locations.length - 1];
@@ -155,6 +157,7 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
     const latestStored = await AsyncStorage.getItem(ATHAN_SETTINGS_STORAGE_KEY);
     if (!latestStored) return;
     const latestSettings = JSON.parse(latestStored) as AthanSettings;
+    latestSettings.notificationSound = normalizeNotificationSound(latestSettings.notificationSound);
     if (!latestSettings.backgroundLocationEnabled || latestSettings.locationMode !== 'auto') return;
 
     const locationNameChanged = normalizeLocationName(latestSettings.locationName)
