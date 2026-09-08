@@ -1,8 +1,7 @@
-name: Build and Upload iOS Apple Review Cleanup
+name: Build and Upload iOS Apple Review Cleanup (paused)
 
-on:
-  push:
-    branches: ['fix/apple-guideline-5-6-cleanup']
+# One-time production build completed successfully.
+# Automatic trigger disabled to avoid rebuilding while submitting the exact validated build.
 
 jobs:
   build_ios:
@@ -11,10 +10,3 @@ jobs:
     params:
       platform: ios
       profile: production
-
-  submit_testflight:
-    name: Upload to TestFlight
-    needs: [build_ios]
-    type: testflight
-    params:
-      build_id: ${{ needs.build_ios.outputs.build_id }}
