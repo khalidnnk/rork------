@@ -31,3 +31,6 @@ jobs:
 
       - name: TypeScript
         run: bun x tsc --noEmit
+
+      - name: Export iOS bundle
+        run: bun x expo export --platform ios --output-dir dist-ci
