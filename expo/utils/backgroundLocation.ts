@@ -80,18 +80,22 @@ function distanceInMeters(
   return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function resolveLocation(latitude: number, longitude: number, language: AppLanguage = 'ar'): Promise<ResolvedLocation> {
+async function resolveLocation(
+  latitude: number,
+  longitude: number,
+  language: AppLanguage = 'ar'
+): Promise<ResolvedLocation> {
   try {
     const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
     const address = addresses[0];
     if (address) {
       return {
         name: address.city
-        || address.district
-        || address.subregion
-        || address.region
-        || address.country
-        || translate(language, 'newArea'),
+          || address.district
+          || address.subregion
+          || address.region
+          || address.country
+          || translate(language, 'newArea'),
         countryCode: address.isoCountryCode || undefined,
       };
     }
@@ -99,9 +103,6 @@ async function resolveLocation(latitude: number, longitude: number, language: Ap
     console.log('[BackgroundLocation] Reverse geocode failed:', error);
   }
 
-  // Reverse geocoding can require a network connection. Fall back to the
-  // bundled city list so travel updates still have a useful Arabic name when
-  // the device is offline.
   const nearestCity = ALL_CITIES.reduce<ResolvedLocation & { distance: number } | null>((nearest, city) => {
     const distance = distanceInMeters(latitude, longitude, city.latitude, city.longitude);
     if (!nearest || distance < nearest.distance) {
@@ -114,13 +115,16 @@ async function resolveLocation(latitude: number, longitude: number, language: Ap
     return nearest;
   }, null);
 
-  // Avoid naming a distant city when the user is outside the bundled coverage.
   return nearestCity && nearestCity.distance <= 150_000
     ? nearestCity
     : { name: translate(language, 'yourCurrentLocation') };
 }
 
-export async function resolveLocationName(latitude: number, longitude: number, language: AppLanguage = 'ar'): Promise<string> {
+export async function resolveLocationName(
+  latitude: number,
+  longitude: number,
+  language: AppLanguage = 'ar'
+): Promise<string> {
   return (await resolveLocation(latitude, longitude, language)).name;
 }
 
@@ -148,9 +152,6 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
     const timezoneId = getDeviceTimezoneId();
     const timezone = getTimezoneOffset(new Date(), timezoneId);
 
-    // Resolving a place name can take long enough for the user to disable
-    // travel updates or select a manual city. Re-read the settings so this
-    // background task never restores tracking with a stale snapshot.
     const latestStored = await AsyncStorage.getItem(ATHAN_SETTINGS_STORAGE_KEY);
     if (!latestStored) return;
     const latestSettings = JSON.parse(latestStored) as AthanSettings;
@@ -213,7 +214,9 @@ export async function startBackgroundLocationUpdates(): Promise<void> {
     deferredUpdatesInterval: 30 * 60 * 1000,
     pausesUpdatesAutomatically: true,
     activityType: Location.ActivityType.Other,
-    showsBackgroundLocationIndicator: false,
+    // When travel updates are enabled by the user, iOS may show its location
+    // indicator. We intentionally do not conceal background location activity.
+    showsBackgroundLocationIndicator: true,
     foregroundService: {
       notificationTitle: translate(language, 'appName'),
       notificationBody: translate(language, 'backgroundUpdate'),
