@@ -1,4 +1,4 @@
-name: Build iOS Apple Review Cleanup
+name: Build and Upload iOS Apple Review Cleanup
 
 on:
   push:
@@ -11,3 +11,10 @@ jobs:
     params:
       platform: ios
       profile: production
+
+  submit_testflight:
+    name: Upload to TestFlight
+    needs: [build_ios]
+    type: testflight
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
