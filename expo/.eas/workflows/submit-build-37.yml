@@ -1,11 +1,14 @@
-name: Upload iOS 1.0.0 (37) to App Store Connect (paused)
+name: Upload Cleaned iOS Build to App Store Connect
 
-# Trigger disabled after the one-time upload request.
+on:
+  push:
+    branches: ['fix/apple-guideline-5-6-cleanup']
+    paths: ['expo/.eas/workflows/submit-build-37.yml']
 
 jobs:
   submit_ios:
-    name: Upload iOS 1.0.0 (37) to App Store Connect
+    name: Upload Cleaned iOS Build to App Store Connect
     type: submit
     params:
-      build_id: 9b9a3b9c-fa00-431f-9808-e1a231f30424
+      build_id: a76bd2f3-0bff-4e9b-9399-97dc1ea74a39
       profile: production
