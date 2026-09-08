@@ -1,21 +1,21 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Platform, AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
-import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Asset } from 'expo-asset';
 import {
+  DailyPrayers,
   PrayerName,
   PrayerTime,
-  DailyPrayers,
   calculatePrayerTimes,
-  getNextPrayerWithTomorrow,
-  getDeviceTimezoneId,
-  getTimezoneOffset,
   getDateKey,
+  getDeviceTimezoneId,
+  getNextPrayerWithTomorrow,
+  getTimezoneOffset,
 } from '@/utils/prayerTimes';
 import {
   cancelAllNotifications,
@@ -30,17 +30,23 @@ import {
 } from '@/utils/backgroundLocation';
 import { publishWidgetData } from '@/utils/widgetData';
 import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  normalizeNotificationSound,
+  type NotificationSoundType,
+} from '@/utils/notificationTypes';
 
+export type { NotificationSoundType } from '@/utils/notificationTypes';
 
 const STORAGE_KEY = ATHAN_SETTINGS_STORAGE_KEY;
-const ATHAN_MAX_DURATION = 300;
+const FULL_ATHAN_MAX_DURATION_SECONDS = 300;
 
 const fullAthanModule = require('@/assets/audio/athan.m4a');
 const hayaModule = require('@/assets/audio/haya_ala_salah.m4a');
 const allahuAkbarModule = require('@/assets/audio/allahu_akbar.m4a');
-const NOTIFICATION_ATHAN_RESUME_POSITION = 30;
 
-export type NotificationSoundType = 'athan' | 'full_athan' | 'allahu_akbar' | 'default' | 'silent';
+function bundledAudioSource(moduleRef: number): { uri: string } {
+  return { uri: Asset.fromModule(moduleRef).uri };
+}
 
 export interface AthanSettings {
   globalEnabled: boolean;
@@ -78,249 +84,86 @@ const DEFAULT_SETTINGS: AthanSettings = {
   longitude: 46.6753,
   timezone: 3,
   timezoneId: 'Asia/Riyadh',
-  locationMode: 'auto' as const,
+  locationMode: 'auto',
   backgroundLocationEnabled: false,
   hasSeenWelcome: false,
-  notificationSound: 'athan' as const,
+  notificationSound: 'athan',
 };
 
 async function loadSettings(): Promise<AthanSettings> {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Full Athan remains available inside the app, but it is no longer an
-      // alert-sound option because iOS notification sounds must be short.
-      if (parsed.notificationSound === 'full_athan') {
-        parsed.notificationSound = 'athan';
-      }
-      return { ...DEFAULT_SETTINGS, ...parsed };
-    }
-  } catch (e) {
-    console.error('[AthanContext] Error loading settings:', e);
+    if (!stored) return DEFAULT_SETTINGS;
+
+    const parsed = JSON.parse(stored) as Partial<AthanSettings> & {
+      notificationSound?: unknown;
+    };
+
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      enabledPrayers: {
+        ...DEFAULT_SETTINGS.enabledPrayers,
+        ...(parsed.enabledPrayers ?? {}),
+      },
+      offsets: {
+        ...DEFAULT_SETTINGS.offsets,
+        ...(parsed.offsets ?? {}),
+      },
+      // Legacy or unknown values are deliberately collapsed to a visible,
+      // supported notification option. Full Athan is manual in-app playback
+      // only and is never a notification mode.
+      notificationSound: normalizeNotificationSound(parsed.notificationSound),
+    };
+  } catch (error) {
+    console.error('[AthanContext] Failed to load settings:', error);
+    return DEFAULT_SETTINGS;
   }
-  return DEFAULT_SETTINGS;
 }
 
 async function saveSettings(settings: AthanSettings): Promise<AthanSettings> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    console.log('[AthanContext] Settings saved');
-  } catch (e) {
-    console.error('[AthanContext] Error saving settings:', e);
-  }
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   return settings;
 }
 
 export const [AthanProvider, useAthan] = createContextHook(() => {
   const queryClient = useQueryClient();
   const { language, t } = useLanguage();
+
   const [settings, setSettings] = useState<AthanSettings>(DEFAULT_SETTINGS);
-  const [locationLoading, setLocationLoading] = useState<boolean>(false);
-  const [isAdhanPlaying, setIsAdhanPlaying] = useState<boolean>(false);
-  const [isPreviewPlaying, setIsPreviewPlaying] = useState<boolean>(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [isAdhanPlaying, setIsAdhanPlaying] = useState(false);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [previewingSoundType, setPreviewingSoundType] = useState<NotificationSoundType | null>(null);
-  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasAutoDetected = useRef(false);
 
-  const [resolvedFullAthan, setResolvedFullAthan] = useState<{ uri: string } | null>(null);
-  const [resolvedHaya, setResolvedHaya] = useState<{ uri: string } | null>(null);
-  const [resolvedAllahuAkbar, setResolvedAllahuAkbar] = useState<{ uri: string } | null>(null);
-  const sourceResolved = useRef<boolean>(false);
-  const _notificationResumeRef = useRef<boolean>(false);
+  const fullAthanSource = useMemo(() => bundledAudioSource(fullAthanModule), []);
+  const hayaSource = useMemo(() => bundledAudioSource(hayaModule), []);
+  const allahuAkbarSource = useMemo(() => bundledAudioSource(allahuAkbarModule), []);
 
-  const getSourceForType = useCallback((type: NotificationSoundType): { uri: string } | null => {
-    if (type === 'full_athan') return resolvedFullAthan;
-    if (type === 'athan') return resolvedHaya;
-    if (type === 'allahu_akbar') return resolvedAllahuAkbar;
-    return null;
-  }, [resolvedFullAthan, resolvedHaya, resolvedAllahuAkbar]);
-
-  const getBundledSourceForType = useCallback((type: NotificationSoundType): { uri: string } => {
-    const module = type === 'full_athan'
-      ? fullAthanModule
-      : type === 'allahu_akbar'
-        ? allahuAkbarModule
-        : hayaModule;
-    return { uri: Asset.fromModule(module).uri };
-  }, []);
-
-  useEffect(() => {
-    async function resolveAudioSources() {
-      if (sourceResolved.current) return;
-      sourceResolved.current = true;
-
-      try {
-        console.log('[AthanContext] Resolving local audio assets...');
-        const fullAsset = Asset.fromModule(fullAthanModule);
-        const hayaAsset = Asset.fromModule(hayaModule);
-        const akbarAsset = Asset.fromModule(allahuAkbarModule);
-        await Promise.all([fullAsset.downloadAsync(), hayaAsset.downloadAsync(), akbarAsset.downloadAsync()]);
-
-        const fullUri = fullAsset.localUri || fullAsset.uri;
-        const hayaUri = hayaAsset.localUri || hayaAsset.uri;
-        const akbarUri = akbarAsset.localUri || akbarAsset.uri;
-
-        if (fullUri) {
-          setResolvedFullAthan({ uri: fullUri });
-          console.log('[AthanContext] Full athan source set to:', fullUri);
-        } else {
-          setResolvedFullAthan(getBundledSourceForType('full_athan'));
-        }
-
-        if (hayaUri) {
-          setResolvedHaya({ uri: hayaUri });
-          console.log('[AthanContext] Haya source set to:', hayaUri);
-        } else {
-          setResolvedHaya(getBundledSourceForType('athan'));
-        }
-
-        if (akbarUri) {
-          setResolvedAllahuAkbar({ uri: akbarUri });
-          console.log('[AthanContext] Allahu Akbar source set to:', akbarUri);
-        } else {
-          setResolvedAllahuAkbar(getBundledSourceForType('allahu_akbar'));
-        }
-      } catch (e) {
-        console.error('[AthanContext] Error resolving audio assets:', e);
-        setResolvedFullAthan(getBundledSourceForType('full_athan'));
-        setResolvedHaya(getBundledSourceForType('athan'));
-        setResolvedAllahuAkbar(getBundledSourceForType('allahu_akbar'));
-      }
-    }
-
-    void resolveAudioSources();
-  }, [getBundledSourceForType]);
-
-  const currentSource = settings.notificationSound === 'full_athan'
-    ? resolvedFullAthan
-    : settings.notificationSound === 'allahu_akbar'
-      ? resolvedAllahuAkbar
-      : resolvedHaya;
-  const player = useAudioPlayer(currentSource);
+  // The audio player exists only for controls that are visible inside the app:
+  // manual Full Athan playback and short notification-sound previews.
+  const player = useAudioPlayer(fullAthanSource);
   const playerStatus = useAudioPlayerStatus(player);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    console.log('[AthanContext] Setting audio mode...');
-    setAudioModeAsync({
+    void setAudioModeAsync({
       playsInSilentMode: true,
-      shouldPlayInBackground: true,
-    }).then(() => {
-      console.log('[AthanContext] Audio mode set successfully');
-    }).catch((e) => console.log('[AthanContext] setAudioModeAsync error:', e));
+      shouldPlayInBackground: false,
+    }).catch((error) => {
+      console.error('[AthanContext] Audio mode setup failed:', error);
+    });
   }, []);
 
   useEffect(() => {
-    console.log('[AthanContext] PlayerStatus update - playing:', playerStatus.playing, 'isLoaded:', playerStatus.isLoaded, 'duration:', playerStatus.duration, 'playbackState:', playerStatus.playbackState);
-  }, [playerStatus.playing, playerStatus.isLoaded, playerStatus.playbackState, playerStatus.duration]);
-
-  useEffect(() => {
-    const sub = player.addListener('playbackStatusUpdate', (status: any) => {
-      if (status?.error) {
-        console.error('[AthanContext] Player error event:', status.error);
-      }
-    });
-    return () => sub.remove();
-  }, [player]);
-
-  useEffect(() => {
-    if (playerStatus.didJustFinish) {
-      console.log('[AthanContext] Athan playback finished');
-      setIsAdhanPlaying(false);
-      if (stopTimerRef.current) {
-        clearTimeout(stopTimerRef.current);
-        stopTimerRef.current = null;
-      }
-    }
-  }, [playerStatus.didJustFinish]);
-
-  const waitForLoaded = useCallback(async (maxWaitMs: number = 5000): Promise<boolean> => {
-    if (player.isLoaded) return true;
-    console.log('[AthanContext] Waiting for player to load...');
-    const start = Date.now();
-    while (Date.now() - start < maxWaitMs) {
-      await new Promise(r => setTimeout(r, 100));
-      if (player.isLoaded) {
-        console.log('[AthanContext] Player loaded after', Date.now() - start, 'ms');
-        return true;
-      }
-    }
-    console.warn('[AthanContext] Player did not load within', maxWaitMs, 'ms');
-    return false;
-  }, [player]);
-
-  const playAthanWithType = useCallback(async (soundType: NotificationSoundType = 'full_athan', resumeFromNotification: boolean = false) => {
-    console.log('[AthanContext] Playing athan type:', soundType, 'isLoaded:', player.isLoaded, 'resume:', resumeFromNotification);
-    try {
-      setIsAdhanPlaying(true);
-      player.volume = 1.0;
-      player.muted = false;
-
-      const actualType = (resumeFromNotification && soundType === 'full_athan') ? 'full_athan' : soundType;
-      const source = getSourceForType(actualType) || getBundledSourceForType(actualType);
-
-      player.replace(source);
-      const loaded = await waitForLoaded(5000);
-      if (loaded) {
-        if (resumeFromNotification && soundType === 'full_athan') {
-          try {
-            await player.seekTo(NOTIFICATION_ATHAN_RESUME_POSITION);
-            console.log('[AthanContext] Seeking to', NOTIFICATION_ATHAN_RESUME_POSITION, 's to continue after notification');
-          } catch (seekErr) {
-            console.log('[AthanContext] Seek error, playing from start:', seekErr);
-          }
-        } else {
-          try { await player.seekTo(0); } catch { /* seek error */ }
-        }
-        player.play();
-        console.log('[AthanContext] Player loaded and playing type:', soundType);
-      } else {
-        console.log('[AthanContext] Trying fallback URL for type:', soundType);
-        player.replace(getBundledSourceForType(actualType));
-        const fallbackLoaded = await waitForLoaded(5000);
-        if (fallbackLoaded) {
-          if (resumeFromNotification && soundType === 'full_athan') {
-            try { await player.seekTo(NOTIFICATION_ATHAN_RESUME_POSITION); } catch { /* seek error */ }
-          } else {
-            try { await player.seekTo(0); } catch { /* seek error */ }
-          }
-          player.play();
-        } else {
-          console.error('[AthanContext] Could not load audio, aborting');
-          setIsAdhanPlaying(false);
-          return;
-        }
-      }
-
-      if (stopTimerRef.current) {
-        clearTimeout(stopTimerRef.current);
-      }
-      stopTimerRef.current = setTimeout(() => {
-        console.log('[AthanContext] Auto-stopping athan after', ATHAN_MAX_DURATION, 'seconds');
-        player.pause();
-        setIsAdhanPlaying(false);
-        stopTimerRef.current = null;
-      }, ATHAN_MAX_DURATION * 1000);
-    } catch (e) {
-      console.error('[AthanContext] Error playing athan:', e);
-      setIsAdhanPlaying(false);
-    }
-  }, [player, waitForLoaded, getSourceForType, getBundledSourceForType]);
-
-  const playAthan = useCallback(async () => {
-    await playAthanWithType('full_athan');
-  }, [playAthanWithType]);
-
-  const stopAthan = useCallback(() => {
-    console.log('[AthanContext] Stopping athan');
-    try {
-      player.pause();
-    } catch (e) {
-      console.log('[AthanContext] Error pausing player:', e);
-    }
+    if (!playerStatus.didJustFinish) return;
     setIsAdhanPlaying(false);
     setIsPreviewPlaying(false);
+    setPreviewingSoundType(null);
     if (stopTimerRef.current) {
       clearTimeout(stopTimerRef.current);
       stopTimerRef.current = null;
@@ -329,64 +172,97 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       clearTimeout(previewTimerRef.current);
       previewTimerRef.current = null;
     }
+  }, [playerStatus.didJustFinish]);
+
+  const stopPlayerTimers = useCallback(() => {
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+  }, []);
+
+  const waitForLoaded = useCallback(async (maxWaitMs = 5000): Promise<boolean> => {
+    if (player.isLoaded) return true;
+    const start = Date.now();
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (player.isLoaded) return true;
+    }
+    return false;
   }, [player]);
 
-  const previewSound = useCallback(async (soundType: NotificationSoundType) => {
-    console.log('[AthanContext] Preview sound:', soundType);
-    if (soundType === 'silent') return;
+  const playSource = useCallback(async (source: { uri: string }): Promise<boolean> => {
+    try {
+      player.pause();
+      player.replace(source);
+      if (!await waitForLoaded()) return false;
+      try {
+        await player.seekTo(0);
+      } catch {
+        // The source is still safe to play from its initial position.
+      }
+      player.volume = 1;
+      player.muted = false;
+      player.play();
+      return true;
+    } catch (error) {
+      console.error('[AthanContext] Audio playback failed:', error);
+      return false;
+    }
+  }, [player, waitForLoaded]);
 
-    if (isPreviewPlaying || isAdhanPlaying) {
-      try { player.pause(); } catch { /* pause error */ }
-      setIsPreviewPlaying(false);
-      setPreviewingSoundType(null);
+  const playAthan = useCallback(async () => {
+    stopPlayerTimers();
+    setIsPreviewPlaying(false);
+    setPreviewingSoundType(null);
+    setIsAdhanPlaying(true);
+
+    const started = await playSource(fullAthanSource);
+    if (!started) {
       setIsAdhanPlaying(false);
-      if (previewTimerRef.current) {
-        clearTimeout(previewTimerRef.current);
-        previewTimerRef.current = null;
-      }
-      if (stopTimerRef.current) {
-        clearTimeout(stopTimerRef.current);
-        stopTimerRef.current = null;
-      }
       return;
     }
 
+    stopTimerRef.current = setTimeout(() => {
+      try {
+        player.pause();
+      } catch {
+        // No-op if playback has already stopped.
+      }
+      setIsAdhanPlaying(false);
+      stopTimerRef.current = null;
+    }, FULL_ATHAN_MAX_DURATION_SECONDS * 1000);
+  }, [fullAthanSource, playSource, player, stopPlayerTimers]);
+
+  const stopAthan = useCallback(() => {
     try {
-      setIsPreviewPlaying(true);
-      setPreviewingSoundType(soundType);
-      player.volume = 1.0;
-      player.muted = false;
+      player.pause();
+    } catch {
+      // No-op if playback is already stopped.
+    }
+    stopPlayerTimers();
+    setIsAdhanPlaying(false);
+    setIsPreviewPlaying(false);
+    setPreviewingSoundType(null);
+  }, [player, stopPlayerTimers]);
 
-      if (soundType === 'athan' || soundType === 'full_athan' || soundType === 'allahu_akbar') {
-        const source = getSourceForType(soundType) || getBundledSourceForType(soundType);
-        console.log('[AthanContext] Preview: replacing with source for type:', soundType);
-        player.replace(source);
-        let loaded = await waitForLoaded(5000);
-        if (!loaded) {
-          console.log('[AthanContext] Preview: trying fallback URL...');
-          player.replace(getBundledSourceForType(soundType));
-          loaded = await waitForLoaded(5000);
-        }
-        if (loaded) {
-          try { await player.seekTo(0); } catch { /* seek error */ }
-          player.play();
-          console.log('[AthanContext] Preview: playing successfully type:', soundType);
-        } else {
-          console.error('[AthanContext] Preview: could not load audio after retries');
-          setIsPreviewPlaying(false);
-          setPreviewingSoundType(null);
-          return;
-        }
+  const previewSound = useCallback(async (soundType: NotificationSoundType) => {
+    if (soundType === 'silent') return;
 
-        const previewDuration = soundType === 'full_athan' ? 10000 : soundType === 'allahu_akbar' ? 30000 : 8000;
-        previewTimerRef.current = setTimeout(() => {
-          console.log('[AthanContext] Preview auto-stop');
-          try { player.pause(); } catch { /* pause error */ }
-          setIsPreviewPlaying(false);
-          setPreviewingSoundType(null);
-          previewTimerRef.current = null;
-        }, previewDuration);
-      } else if (soundType === 'default') {
+    if (isPreviewPlaying || isAdhanPlaying) {
+      stopAthan();
+      return;
+    }
+
+    setIsPreviewPlaying(true);
+    setPreviewingSoundType(soundType);
+
+    try {
+      if (soundType === 'default') {
         if (Platform.OS !== 'web') {
           await Notifications.scheduleNotificationAsync({
             content: {
@@ -397,69 +273,62 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
             trigger: null,
           });
         }
-        setTimeout(() => {
+        previewTimerRef.current = setTimeout(() => {
           setIsPreviewPlaying(false);
           setPreviewingSoundType(null);
+          previewTimerRef.current = null;
         }, 1500);
+        return;
       }
-    } catch (e) {
-      console.error('[AthanContext] Preview error:', e);
+
+      const source = soundType === 'allahu_akbar' ? allahuAkbarSource : hayaSource;
+      const started = await playSource(source);
+      if (!started) {
+        setIsPreviewPlaying(false);
+        setPreviewingSoundType(null);
+        return;
+      }
+
+      const durationMs = soundType === 'allahu_akbar' ? 30_000 : 8_000;
+      previewTimerRef.current = setTimeout(() => {
+        try {
+          player.pause();
+        } catch {
+          // No-op if playback has already stopped.
+        }
+        setIsPreviewPlaying(false);
+        setPreviewingSoundType(null);
+        previewTimerRef.current = null;
+      }, durationMs);
+    } catch (error) {
+      console.error('[AthanContext] Sound preview failed:', error);
       setIsPreviewPlaying(false);
       setPreviewingSoundType(null);
     }
-  }, [player, isPreviewPlaying, isAdhanPlaying, getSourceForType, getBundledSourceForType, waitForLoaded, t]);
+  }, [
+    allahuAkbarSource,
+    hayaSource,
+    isAdhanPlaying,
+    isPreviewPlaying,
+    playSource,
+    player,
+    stopAthan,
+    t,
+  ]);
 
   const stopPreview = useCallback(() => {
-    console.log('[AthanContext] Stopping preview');
-    try { player.pause(); } catch { /* pause error */ }
-    setIsPreviewPlaying(false);
-    setPreviewingSoundType(null);
+    try {
+      player.pause();
+    } catch {
+      // No-op if playback has already stopped.
+    }
     if (previewTimerRef.current) {
       clearTimeout(previewTimerRef.current);
       previewTimerRef.current = null;
     }
+    setIsPreviewPlaying(false);
+    setPreviewingSoundType(null);
   }, [player]);
-
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-
-    const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
-      const data = notification.request.content.data;
-      if (data?.prayerName) {
-        console.log('[AthanContext] Prayer notification received (foreground) for:', data.prayerName);
-        const prayerName = data.prayerName as PrayerName;
-        if (settings.globalEnabled && settings.enabledPrayers[prayerName]) {
-          const soundType = settings.notificationSound;
-          console.log('[AthanContext] Auto-playing athan for notification:', prayerName, 'soundType:', soundType);
-          if (soundType === 'athan' || soundType === 'full_athan' || soundType === 'allahu_akbar') {
-            void playAthanWithType(soundType, false);
-          }
-        }
-      }
-    });
-
-    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      const actionId = response.actionIdentifier;
-      console.log('[AthanContext] Notification response, actionId:', actionId, 'data:', JSON.stringify(data));
-      if (data?.prayerName) {
-        const prayerName = data.prayerName as PrayerName;
-        const soundType = (data.soundType as NotificationSoundType) || settings.notificationSound;
-        console.log('[AthanContext] Notification tapped/action for:', prayerName, 'soundType:', soundType, 'action:', actionId);
-        if (actionId === 'OPEN_ATHAN' || actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-          if (soundType === 'athan' || soundType === 'full_athan' || soundType === 'allahu_akbar') {
-            const shouldResume = soundType === 'full_athan';
-            void playAthanWithType(soundType, shouldResume);
-          }
-        }
-      }
-    });
-
-    return () => {
-      receivedSub.remove();
-      responseSub.remove();
-    };
-  }, [settings.globalEnabled, settings.enabledPrayers, settings.notificationSound, playAthanWithType]);
 
   const settingsQuery = useQuery({
     queryKey: ['athan-settings'],
@@ -474,54 +343,45 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     },
   });
 
-  const hasAutoDetected = useRef<boolean>(false);
-
   useEffect(() => {
-    if (settingsQuery.data) {
-      setSettings(settingsQuery.data);
-    }
-  }, [settingsQuery.data]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (settingsQuery.data) setSettings(settingsQuery.data);
+  }, [settingsQuery.data]);
 
-  const updateSettings = useCallback(
-    (partial: Partial<AthanSettings>) => {
-      setSettings(prev => {
-        const updated = { ...prev, ...partial };
-        saveMutation.mutate(updated);
-        return updated;
-      });
-    },
-    [saveMutation]
-  );
+  const updateSettings = useCallback((partial: Partial<AthanSettings>) => {
+    setSettings((previous) => {
+      const next = { ...previous, ...partial };
+      saveMutation.mutate(next);
+      return next;
+    });
+  }, [saveMutation]);
 
-  const togglePrayer = useCallback(
-    (name: PrayerName) => {
-      const updated = {
-        ...settings,
+  const togglePrayer = useCallback((name: PrayerName) => {
+    setSettings((previous) => {
+      const next: AthanSettings = {
+        ...previous,
         enabledPrayers: {
-          ...settings.enabledPrayers,
-          [name]: !settings.enabledPrayers[name],
+          ...previous.enabledPrayers,
+          [name]: !previous.enabledPrayers[name],
         },
       };
-      setSettings(updated);
-      saveMutation.mutate(updated);
-    },
-    [settings, saveMutation]
-  );
+      saveMutation.mutate(next);
+      return next;
+    });
+  }, [saveMutation]);
 
-  const setOffset = useCallback(
-    (name: PrayerName, offset: number) => {
-      const updated = {
-        ...settings,
+  const setOffset = useCallback((name: PrayerName, offset: number) => {
+    setSettings((previous) => {
+      const next: AthanSettings = {
+        ...previous,
         offsets: {
-          ...settings.offsets,
+          ...previous.offsets,
           [name]: offset,
         },
       };
-      setSettings(updated);
-      saveMutation.mutate(updated);
-    },
-    [settings, saveMutation]
-  );
+      saveMutation.mutate(next);
+      return next;
+    });
+  }, [saveMutation]);
 
   const toggleGlobal = useCallback(() => {
     updateSettings({ globalEnabled: !settings.globalEnabled });
@@ -531,86 +391,54 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     updateSettings({ hasSeenWelcome: true });
   }, [updateSettings]);
 
-  const setLocation = useCallback(
-    (latitude: number, longitude: number, locationName: string, timezone: number) => {
+  const setLocation = useCallback((
+    latitude: number,
+    longitude: number,
+    locationName: string,
+    timezone: number
+  ) => {
+    updateSettings({
+      latitude,
+      longitude,
+      locationName,
+      timezone,
+      locationMode: 'manual',
+    });
+    setLocationLoading(false);
+  }, [updateSettings]);
+
+  const detectAutoLocationSilent = useCallback(async () => {
+    if (Platform.OS === 'web') return;
+
+    try {
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== 'granted') return;
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const latitude = location.coords.latitude;
+      const longitude = location.coords.longitude;
+      const timezoneId = getDeviceTimezoneId();
+      const timezone = getTimezoneOffset();
+      const locationName = await resolveLocationName(latitude, longitude, language);
+
       updateSettings({
         latitude,
         longitude,
         locationName,
         timezone,
-        locationMode: 'manual',
-      });
-      setLocationLoading(false);
-    },
-    [updateSettings]
-  );
-
-  const detectAutoLocationSilent = useCallback(async () => {
-    try {
-      if (Platform.OS === 'web') {
-        if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              const lat = position.coords.latitude;
-              const lng = position.coords.longitude;
-              const tz = getTimezoneOffset();
-              const timezoneId = getDeviceTimezoneId();
-              let locationName = `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
-              updateSettings({
-                latitude: lat,
-                longitude: lng,
-                timezone: tz,
-                timezoneId,
-                locationName,
-                locationMode: 'auto',
-              });
-            },
-            () => {
-              console.log('[AthanContext] Web geolocation denied silently');
-            }
-          );
-        }
-        return;
-      }
-
-      // Never show a permission prompt silently. Onboarding/settings own the
-      // prompt; automatic refresh only uses a permission already granted.
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('[AthanContext] Location permission denied on startup');
-        return;
-      }
-
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const lat = loc.coords.latitude;
-      const lng = loc.coords.longitude;
-      const tz = getTimezoneOffset();
-      const timezoneId = getDeviceTimezoneId();
-
-      const locationName = await resolveLocationName(lat, lng, language);
-
-      updateSettings({
-        latitude: lat,
-        longitude: lng,
-        timezone: tz,
         timezoneId,
-        locationName,
         locationMode: 'auto',
       });
-    } catch (e) {
-      console.error('[AthanContext] Silent location error:', e);
+    } catch (error) {
+      console.error('[AthanContext] Silent location refresh failed:', error);
     }
-  }, [updateSettings, language]);
+  }, [language, updateSettings]);
 
-  // Automatic is the default mode. It remains active across launches until
-  // the user explicitly chooses a city, which switches locationMode to manual.
   useEffect(() => {
     const loadedSettings = settingsQuery.data;
     if (!loadedSettings || hasAutoDetected.current) return;
-
     hasAutoDetected.current = true;
     if (loadedSettings.locationMode === 'auto') {
       void detectAutoLocationSilent();
@@ -621,66 +449,39 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     setLocationLoading(true);
     try {
       if (Platform.OS === 'web') {
-        if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              const lat = position.coords.latitude;
-              const lng = position.coords.longitude;
-              const tz = getTimezoneOffset();
-              const timezoneId = getDeviceTimezoneId();
-              updateSettings({
-                latitude: lat,
-                longitude: lng,
-                timezone: tz,
-                timezoneId,
-                locationName: `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`,
-                locationMode: 'auto',
-              });
-              setLocationLoading(false);
-            },
-            () => {
-              console.log('[AthanContext] Web geolocation denied, using defaults');
-              setLocationLoading(false);
-            }
-          );
-        } else {
-          setLocationLoading(false);
-        }
-        return;
-      }
-
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('[AthanContext] Location permission denied');
         setLocationLoading(false);
         return;
       }
 
-      const loc = await Location.getCurrentPositionAsync({
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        setLocationLoading(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-
-      const lat = loc.coords.latitude;
-      const lng = loc.coords.longitude;
-      const tz = getTimezoneOffset();
+      const latitude = location.coords.latitude;
+      const longitude = location.coords.longitude;
       const timezoneId = getDeviceTimezoneId();
-
-      const locationName = await resolveLocationName(lat, lng, language);
+      const timezone = getTimezoneOffset();
+      const locationName = await resolveLocationName(latitude, longitude, language);
 
       updateSettings({
-        latitude: lat,
-        longitude: lng,
-        timezone: tz,
-        timezoneId,
+        latitude,
+        longitude,
         locationName,
+        timezone,
+        timezoneId,
         locationMode: 'auto',
       });
-      setLocationLoading(false);
-    } catch (e) {
-      console.error('[AthanContext] Location error:', e);
+    } catch (error) {
+      console.error('[AthanContext] Location refresh failed:', error);
+    } finally {
       setLocationLoading(false);
     }
-  }, [updateSettings, language]);
+  }, [language, updateSettings]);
 
   const setBackgroundLocationEnabled = useCallback(async (enabled: boolean): Promise<boolean> => {
     if (Platform.OS === 'web') return false;
@@ -691,20 +492,23 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       return true;
     }
 
-    const foreground = await Location.requestForegroundPermissionsAsync();
-    if (foreground.status !== 'granted') {
+    const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+    if (foregroundPermission.status !== 'granted') {
       updateSettings({ backgroundLocationEnabled: false });
       return false;
     }
 
-    const background = await Location.requestBackgroundPermissionsAsync();
-    if (background.status !== 'granted') {
+    const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+    if (backgroundPermission.status !== 'granted') {
       updateSettings({ backgroundLocationEnabled: false });
       return false;
     }
 
     await startBackgroundLocationUpdates();
-    updateSettings({ backgroundLocationEnabled: true, locationMode: 'auto' });
+    updateSettings({
+      backgroundLocationEnabled: true,
+      locationMode: 'auto',
+    });
     return true;
   }, [updateSettings]);
 
@@ -712,20 +516,25 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     if (Platform.OS === 'web' || settingsQuery.isLoading) return;
     if (!settings.backgroundLocationEnabled) return;
 
-    void Location.getBackgroundPermissionsAsync().then((permission) => {
-      if (permission.status === 'granted') {
-        return startBackgroundLocationUpdates();
-      }
-      updateSettings({ backgroundLocationEnabled: false });
-    }).catch((error) => {
-      console.error('[AthanContext] Background location restore failed:', error);
-    });
+    void Location.getBackgroundPermissionsAsync()
+      .then((permission) => {
+        if (permission.status === 'granted') {
+          return startBackgroundLocationUpdates();
+        }
+        updateSettings({ backgroundLocationEnabled: false });
+      })
+      .catch((error) => {
+        console.error('[AthanContext] Background location restore failed:', error);
+      });
   }, [settings.backgroundLocationEnabled, settingsQuery.isLoading, updateSettings]);
 
-  const [dateKey, setDateKey] = useState<string>(getDateKey());
+  const [dateKey, setDateKey] = useState(getDateKey());
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayers>(() => {
-    console.log('[AthanContext] Initial prayer times calculation');
-    const timezone = getTimezoneOffset(new Date(), DEFAULT_SETTINGS.timezoneId, DEFAULT_SETTINGS.timezone);
+    const timezone = getTimezoneOffset(
+      new Date(),
+      DEFAULT_SETTINGS.timezoneId,
+      DEFAULT_SETTINGS.timezone
+    );
     return calculatePrayerTimes(
       new Date(),
       DEFAULT_SETTINGS.latitude,
@@ -746,19 +555,24 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
       timezone,
       settings.offsets
     );
-    console.log('[AthanContext] Prayer times:', prayers.prayers.map(p => `${p.name}: ${p.timeStr}`).join(', '));
     setDailyPrayers(prayers);
     return prayers;
-  }, [settings.latitude, settings.longitude, settings.timezone, settings.timezoneId, settings.offsets]);
+  }, [
+    settings.latitude,
+    settings.longitude,
+    settings.offsets,
+    settings.timezone,
+    settings.timezoneId,
+  ]);
 
   useEffect(() => {
     recalculatePrayers();
-  }, [recalculatePrayers, dateKey]);
+  }, [dateKey, recalculatePrayers]);
 
   useEffect(() => {
     if (settingsQuery.isLoading) return;
     publishWidgetData(settings, language);
-  }, [settings, language, settingsQuery.isLoading]);
+  }, [language, settings, settingsQuery.isLoading]);
 
   useEffect(() => {
     const updateNextPrayer = () => {
@@ -771,70 +585,89 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
         timezone,
         settings.offsets
       );
-      if (result) {
-        setNextPrayer((prev) => {
-          if (!prev || prev.name !== result.prayer.name || prev.time.getTime() !== result.prayer.time.getTime()) {
-            console.log(`[AthanContext] Next prayer: ${result.prayer.name} at ${result.prayer.timeStr} (tomorrow: ${result.isTomorrow}) | now: ${now.toLocaleTimeString()}`);
-            return result.prayer;
-          }
-          return prev;
-        });
-      } else {
-        setNextPrayer(null);
-      }
+      setNextPrayer(result?.prayer ?? null);
 
-      const newDateKey = getDateKey();
-      if (newDateKey !== dateKey) {
-        console.log('[AthanContext] Date changed, recalculating');
-        setDateKey(newDateKey);
-      }
+      const nextDateKey = getDateKey();
+      if (nextDateKey !== dateKey) setDateKey(nextDateKey);
     };
 
     updateNextPrayer();
     const interval = setInterval(updateNextPrayer, 3000);
     return () => clearInterval(interval);
-  }, [dailyPrayers, settings.latitude, settings.longitude, settings.timezone, settings.offsets, dateKey]);
+  }, [
+    dailyPrayers,
+    dateKey,
+    settings.latitude,
+    settings.longitude,
+    settings.offsets,
+    settings.timezone,
+    settings.timezoneId,
+  ]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        console.log('[AthanContext] App became active, refreshing prayer times');
-        void loadSettings().then((storedSettings) => {
-          setSettings(storedSettings);
-          publishWidgetData(storedSettings, language);
-          setDailyPrayers(calculatePrayerTimes(
+      if (state !== 'active') return;
+
+      void loadSettings().then((storedSettings) => {
+        setSettings(storedSettings);
+        publishWidgetData(storedSettings, language);
+        setDailyPrayers(calculatePrayerTimes(
+          new Date(),
+          storedSettings.latitude,
+          storedSettings.longitude,
+          getTimezoneOffset(
             new Date(),
-            storedSettings.latitude,
-            storedSettings.longitude,
-            getTimezoneOffset(new Date(), storedSettings.timezoneId, storedSettings.timezone),
-            storedSettings.offsets
-          ));
-          if (storedSettings.locationMode === 'auto') {
-            void detectAutoLocationSilent();
-          }
-        });
-      }
+            storedSettings.timezoneId,
+            storedSettings.timezone
+          ),
+          storedSettings.offsets
+        ));
+        if (storedSettings.locationMode === 'auto') {
+          void detectAutoLocationSilent();
+        }
+      });
     });
+
     return () => subscription.remove();
   }, [detectAutoLocationSilent, language]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || settingsQuery.isLoading) return;
 
     if (!settings.globalEnabled) {
       void cancelAllNotifications();
       return;
     }
 
-    async function scheduleNotifs() {
+    void (async () => {
       const granted = await requestNotificationPermissions(language);
-      if (granted) {
-        await scheduleAllNotifications(dailyPrayers.prayers, settings.enabledPrayers, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, language, settings.timezone, settings.timezoneId);
-      }
-    }
+      if (!granted) return;
 
-    void scheduleNotifs();
-  }, [dailyPrayers, settings.enabledPrayers, settings.globalEnabled, settings.notificationSound, settings.latitude, settings.longitude, settings.offsets, settings.timezone, settings.timezoneId, language]);
+      await scheduleAllNotifications(
+        dailyPrayers.prayers,
+        settings.enabledPrayers,
+        settings.notificationSound,
+        settings.latitude,
+        settings.longitude,
+        settings.offsets,
+        language,
+        settings.timezone,
+        settings.timezoneId
+      );
+    })();
+  }, [
+    dailyPrayers,
+    language,
+    settings.enabledPrayers,
+    settings.globalEnabled,
+    settings.latitude,
+    settings.longitude,
+    settings.notificationSound,
+    settings.offsets,
+    settings.timezone,
+    settings.timezoneId,
+    settingsQuery.isLoading,
+  ]);
 
   return useMemo(() => ({
     settings,
@@ -853,7 +686,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     isAdhanPlaying,
     setIsAdhanPlaying,
     playAthan,
-    playAthanWithType,
     stopAthan,
     playerStatus,
     recalculatePrayers,
@@ -862,29 +694,26 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     previewSound,
     stopPreview,
   }), [
-    settings,
-    updateSettings,
-    togglePrayer,
-    setOffset,
-    toggleGlobal,
-    dismissWelcome,
-    setLocation,
-    detectAutoLocation,
-    setBackgroundLocationEnabled,
     dailyPrayers,
-    nextPrayer,
-    locationLoading,
-    settingsQuery.isLoading,
+    detectAutoLocation,
+    dismissWelcome,
     isAdhanPlaying,
-    setIsAdhanPlaying,
-    playAthan,
-    playAthanWithType,
-    stopAthan,
-    playerStatus,
-    recalculatePrayers,
     isPreviewPlaying,
-    previewingSoundType,
+    locationLoading,
+    nextPrayer,
+    playAthan,
+    playerStatus,
     previewSound,
+    previewingSoundType,
+    recalculatePrayers,
+    setBackgroundLocationEnabled,
+    setOffset,
+    settings,
+    settingsQuery.isLoading,
+    stopAthan,
     stopPreview,
+    toggleGlobal,
+    togglePrayer,
+    updateSettings,
   ]);
 });
