@@ -1,0 +1,22 @@
+name: Build and Upload iOS App Review Resubmission
+
+on:
+  push:
+    branches: ['fix/apple-guideline-5-6-cleanup']
+    paths: ['expo/.eas/workflows/build-app-review-resubmission.yml']
+
+jobs:
+  build_ios:
+    name: Build New iOS Binary for App Review
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_ios:
+    name: Upload New Binary to App Store Connect
+    needs: [build_ios]
+    type: submit
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production
