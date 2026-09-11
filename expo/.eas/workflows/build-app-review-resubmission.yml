@@ -1,4 +1,4 @@
-name: Build and Upload iOS App Review Resubmission
+name: Upload iOS Build 45 for App Review Resubmission
 
 on:
   push:
@@ -6,17 +6,9 @@ on:
     paths: ['expo/.eas/workflows/build-app-review-resubmission.yml']
 
 jobs:
-  build_ios:
-    name: Build New iOS Binary for App Review
-    type: build
-    params:
-      platform: ios
-      profile: production
-
   submit_ios:
-    name: Upload New Binary to App Store Connect
-    needs: [build_ios]
+    name: Upload iOS Build 45 to App Store Connect
     type: submit
     params:
-      build_id: ${{ needs.build_ios.outputs.build_id }}
+      build_id: 6316a14b-88d8-4cb2-8cb8-15c341c2e5fd
       profile: production
