@@ -25,8 +25,6 @@ import {
 import {
   ATHAN_SETTINGS_STORAGE_KEY,
   resolveLocationName,
-  startBackgroundLocationUpdates,
-  stopBackgroundLocationUpdates,
 } from '@/utils/backgroundLocation';
 import { publishWidgetData } from '@/utils/widgetData';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -58,7 +56,6 @@ export interface AthanSettings {
   timezone: number;
   timezoneId?: string;
   locationMode: 'auto' | 'manual';
-  backgroundLocationEnabled: boolean;
   hasSeenWelcome: boolean;
   notificationSound: NotificationSoundType;
 }
@@ -85,7 +82,6 @@ const DEFAULT_SETTINGS: AthanSettings = {
   timezone: 3,
   timezoneId: 'Asia/Riyadh',
   locationMode: 'auto',
-  backgroundLocationEnabled: false,
   hasSeenWelcome: false,
   notificationSound: 'athan',
 };
@@ -483,51 +479,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     }
   }, [language, updateSettings]);
 
-  const setBackgroundLocationEnabled = useCallback(async (enabled: boolean): Promise<boolean> => {
-    if (Platform.OS === 'web') return false;
-
-    if (!enabled) {
-      await stopBackgroundLocationUpdates();
-      updateSettings({ backgroundLocationEnabled: false });
-      return true;
-    }
-
-    const foregroundPermission = await Location.requestForegroundPermissionsAsync();
-    if (foregroundPermission.status !== 'granted') {
-      updateSettings({ backgroundLocationEnabled: false });
-      return false;
-    }
-
-    const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
-    if (backgroundPermission.status !== 'granted') {
-      updateSettings({ backgroundLocationEnabled: false });
-      return false;
-    }
-
-    await startBackgroundLocationUpdates();
-    updateSettings({
-      backgroundLocationEnabled: true,
-      locationMode: 'auto',
-    });
-    return true;
-  }, [updateSettings]);
-
-  useEffect(() => {
-    if (Platform.OS === 'web' || settingsQuery.isLoading) return;
-    if (!settings.backgroundLocationEnabled) return;
-
-    void Location.getBackgroundPermissionsAsync()
-      .then((permission) => {
-        if (permission.status === 'granted') {
-          return startBackgroundLocationUpdates();
-        }
-        updateSettings({ backgroundLocationEnabled: false });
-      })
-      .catch((error) => {
-        console.error('[AthanContext] Background location restore failed:', error);
-      });
-  }, [settings.backgroundLocationEnabled, settingsQuery.isLoading, updateSettings]);
-
   const [dateKey, setDateKey] = useState(getDateKey());
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayers>(() => {
     const timezone = getTimezoneOffset(
@@ -678,7 +629,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     dismissWelcome,
     setLocation,
     detectAutoLocation,
-    setBackgroundLocationEnabled,
     dailyPrayers,
     nextPrayer,
     locationLoading,
@@ -706,7 +656,6 @@ export const [AthanProvider, useAthan] = createContextHook(() => {
     previewSound,
     previewingSoundType,
     recalculatePrayers,
-    setBackgroundLocationEnabled,
     setOffset,
     settings,
     settingsQuery.isLoading,
