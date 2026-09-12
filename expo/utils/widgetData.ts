@@ -74,7 +74,7 @@ export function publishWidgetData(settings: AthanSettings, language?: AppLanguag
       storage.set('locationName', settings.locationName);
       storage.set('locationNameAr', locationNameAr);
       storage.set('locationNameEn', locationNameEn);
-      storage.set('alwaysLocationEnabled', settings.backgroundLocationEnabled ? 1 : 0);
+      storage.set('alwaysLocationEnabled', 0);
       if (language) storage.set('appLanguage', language);
 
       // ExtensionStorage serializes arrays as JSON Data in the App Group.

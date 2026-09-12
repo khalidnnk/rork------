@@ -1,0 +1,12 @@
+name: Build and Upload iOS Apple Review Cleanup (paused)
+
+# One-time production build completed successfully.
+# Automatic trigger disabled to avoid rebuilding while submitting the exact validated build.
+
+jobs:
+  build_ios:
+    name: Build iOS Apple Review Cleanup
+    type: build
+    params:
+      platform: ios
+      profile: production

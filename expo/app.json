@@ -23,11 +23,7 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Alsulaimani Athan uses your location while you use the app to identify your area, calculate prayer times, and schedule local Athan notifications.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Alsulaimani Athan uses significant location changes in the background when you travel to update prayer times and local Athan notifications without requiring you to open the app. Your location history is not stored or shared.",
-        "UIBackgroundModes": [
-          "location"
-        ]
+        "NSLocationWhenInUseUsageDescription": "Alsulaimani Athan uses your location while you use the app to identify your area, calculate prayer times, and schedule local Athan notifications."
       },
       "entitlements": {
         "com.apple.security.application-groups": [
@@ -45,9 +41,6 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
         "POST_NOTIFICATIONS"
       ],
       "blockedPermissions": [
@@ -71,11 +64,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Alsulaimani Athan uses your location while you use the app to identify your area, calculate prayer times, and schedule local Athan notifications.",
-          "locationAlwaysPermission": "Alsulaimani Athan uses significant location changes in the background when you travel to update prayer times and local Athan notifications.",
-          "locationAlwaysAndWhenInUsePermission": "Alsulaimani Athan uses significant location changes in the background when you travel to update prayer times and local Athan notifications without requiring you to open the app. Your location history is not stored or shared.",
-          "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true
+          "locationWhenInUsePermission": "Alsulaimani Athan uses your location while you use the app to identify your area, calculate prayer times, and schedule local Athan notifications."
         }
       ],
       "@bacons/apple-targets",
@@ -92,13 +81,11 @@
     "locales": {
       "ar": {
         "CFBundleDisplayName": "أذان السليماني",
-        "NSLocationWhenInUseUsageDescription": "يستخدم أذان السليماني موقعك أثناء استخدام التطبيق لتحديد مدينتك وحساب مواقيت الصلاة وجدولة تنبيهات الأذان حسب منطقتك.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "يستخدم أذان السليماني تغيّرات الموقع المهمة في الخلفية عند سفرك إلى منطقة أخرى، لتحديث مواقيت الصلاة وتنبيهات الأذان المحلية دون الحاجة لفتح التطبيق. لا يتم حفظ سجل تحركاتك أو مشاركة موقعك."
+        "NSLocationWhenInUseUsageDescription": "يستخدم أذان السليماني موقعك أثناء استخدام التطبيق لتحديد مدينتك وحساب مواقيت الصلاة وجدولة تنبيهات الأذان حسب منطقتك."
       },
       "en": {
         "CFBundleDisplayName": "Alsulaimani Athan",
-        "NSLocationWhenInUseUsageDescription": "Alsulaimani Athan uses your location while you use the app to identify your area, calculate prayer times, and schedule local Athan notifications.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Alsulaimani Athan uses significant location changes in the background when you travel to update prayer times and local Athan notifications without requiring you to open the app. Your location history is not stored or shared."
+        "NSLocationWhenInUseUsageDescription": "Alsulaimani Athan uses your location while you use the app to identify your area, calculate prayer times, and schedule local Athan notifications."
       }
     },
     "experiments": {
