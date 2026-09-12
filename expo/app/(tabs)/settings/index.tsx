@@ -9,7 +9,6 @@ import {
   Animated,
   Modal,
   useWindowDimensions,
-  Alert,
   GestureResponderEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +28,6 @@ import {
   Moon,
   Sun,
   Calculator,
-  Route,
   Languages,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -230,7 +228,6 @@ export default function SettingsScreen() {
     stopAthan,
     playerStatus,
     detectAutoLocation,
-    setBackgroundLocationEnabled,
     locationLoading,
     updateSettings,
     isPreviewPlaying,
@@ -275,44 +272,6 @@ export default function SettingsScreen() {
     void detectAutoLocation();
   }, [detectAutoLocation]);
 
-  const applyBackgroundLocationToggle = useCallback(async (enabled: boolean) => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      const granted = await setBackgroundLocationEnabled(enabled);
-      if (enabled && granted) {
-        await detectAutoLocation();
-      }
-      if (enabled && !granted) {
-        Alert.alert(
-          t('alwaysLocationTitle'),
-          t('alwaysLocationMessage')
-        );
-      }
-    } catch (error) {
-      console.error('[Settings] Background location toggle failed:', error);
-      Alert.alert(t('autoUpdateFailed'), t('checkLocationPermission'));
-    }
-  }, [detectAutoLocation, setBackgroundLocationEnabled, t]);
-
-  const handleBackgroundLocationToggle = useCallback((enabled: boolean) => {
-    if (!enabled) {
-      void applyBackgroundLocationToggle(false);
-      return;
-    }
-
-    Alert.alert(
-      t('backgroundLocationDisclosureTitle'),
-      t('backgroundLocationDisclosureMessage'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('continueEnable'),
-          onPress: () => void applyBackgroundLocationToggle(true),
-        },
-      ]
-    );
-  }, [applyBackgroundLocationToggle, t]);
-
   const handleSoundChange = useCallback(
     (sound: NotificationSoundType) => {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -338,7 +297,6 @@ export default function SettingsScreen() {
 
   const handleSelectCity = useCallback((city: City) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    void setBackgroundLocationEnabled(false);
     updateSettings({
       latitude: city.latitude,
       longitude: city.longitude,
@@ -348,7 +306,7 @@ export default function SettingsScreen() {
       locationMode: 'manual',
     });
     setCityPickerVisible(false);
-  }, [setBackgroundLocationEnabled, updateSettings]);
+  }, [updateSettings]);
 
   const handleOpenCityPicker = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -631,28 +589,6 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.cardRow}>
-              <View style={styles.cardRowLeft}>
-                <Route size={18} color={settings.backgroundLocationEnabled ? Colors.accent : Colors.textSecondary} />
-                <View style={styles.cardRowTextWrap}>
-                  <Text style={styles.cardRowTitle}>{t('travelUpdates')}</Text>
-                  <Text style={styles.cardRowSubtitle}>
-                    {t('travelUpdatesDescription')}
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={settings.backgroundLocationEnabled}
-                onValueChange={(enabled) => void handleBackgroundLocationToggle(enabled)}
-                trackColor={{ false: Colors.surface, true: Colors.accent }}
-                thumbColor={Colors.white}
-                testID="background-location-switch"
-                accessibilityLabel={t('travelUpdatesLabel')}
-              />
             </View>
 
             <View style={styles.divider} />
