@@ -10,7 +10,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AthanProvider, useAthan } from '@/contexts/AthanContext';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import LocationOnboarding from '@/components/LocationOnboarding';
-import '@/utils/backgroundLocation';
 
 void SplashScreen.preventAutoHideAsync();
 SystemUI.setBackgroundColorAsync('#0B1A1F').catch(() => {});

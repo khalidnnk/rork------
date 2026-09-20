@@ -96,7 +96,7 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
     }).start();
   }, [fadeAnim, slideAnim, iconScale, featureAnims, featureOpacities, buttonAnim, reduceMotion]);
 
-  const handleAllow = useCallback(async () => {
+  const handleContinue = useCallback(async () => {
     try {
       if (Platform.OS === 'web') {
         onComplete(true);
@@ -109,11 +109,6 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
       console.error('[LocationOnboarding] Permission error:', e);
       onComplete(false);
     }
-  }, [onComplete]);
-
-  const handleSkip = useCallback(() => {
-    console.log('[LocationOnboarding] User skipped location permission');
-    onComplete(false);
   }, [onComplete]);
 
   const features = [
@@ -206,11 +201,11 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
         <Animated.View style={[styles.bottomSection, { opacity: buttonAnim }]}>
           <TouchableOpacity
             style={styles.allowButton}
-            onPress={handleAllow}
+            onPress={handleContinue}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel={t('allowLocationLabel')}
-            testID="location-allow-button"
+            accessibilityLabel={t('continueLocationLabel')}
+            testID="location-continue-button"
           >
             <LinearGradient
               colors={[Colors.accent, '#B8922E']}
@@ -219,19 +214,8 @@ export default function LocationOnboarding({ onComplete }: LocationOnboardingPro
               style={styles.allowButtonGradient}
             >
               <MapPin size={20} color="#0B1A1F" />
-              <Text style={styles.allowButtonText}>{t('allowLocation')}</Text>
+              <Text style={styles.allowButtonText}>{t('continue')}</Text>
             </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.skipButton}
-            onPress={handleSkip}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('skipManualLabel')}
-            testID="location-skip-button"
-          >
-            <Text style={styles.skipButtonText}>{t('skipManual')}</Text>
           </TouchableOpacity>
         </Animated.View>
         </Animated.View>
@@ -350,14 +334,5 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Dubai-Bold',
     color: '#0B1A1F',
-  },
-  skipButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  skipButtonText: {
-    fontSize: 14,
-    fontFamily: 'Dubai-Medium',
-    color: Colors.textMutedReadable,
   },
 });

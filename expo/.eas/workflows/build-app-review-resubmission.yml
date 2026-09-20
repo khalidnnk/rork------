@@ -1,0 +1,14 @@
+name: Upload iOS Build 45 for App Review Resubmission
+
+on:
+  push:
+    branches: ['fix/apple-guideline-5-6-cleanup']
+    paths: ['expo/.eas/workflows/build-app-review-resubmission.yml']
+
+jobs:
+  submit_ios:
+    name: Upload iOS Build 45 to App Store Connect
+    type: submit
+    params:
+      build_id: 6316a14b-88d8-4cb2-8cb8-15c341c2e5fd
+      profile: production
